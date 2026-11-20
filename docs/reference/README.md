@@ -6,7 +6,7 @@ Bố cục và toạ độ chính thức nằm trong [SPEC #1](https://github.co
 
 ## Ảnh phác bố cục
 
-Dựng lại bố cục ảnh mẫu chỉ bằng elip, đa giác, gradient và trộn alpha trên khung 1280×720 (script `tools/scene_sketch.py`). Bảng toạ độ: [layout.md](layout.md).
+Dựng lại bố cục ảnh mẫu theo phong cách truyện tranh (gộp khối, tô 3 tông, viền) chỉ bằng elip, đa giác, gradient và trộn alpha trên khung 1280×720 (script `tools/comic_sketch.py`). Bảng toạ độ: [layout.md](layout.md). Phong cách vẽ: [../style-guide.md](../style-guide.md).
 
 | Ngày | Đêm |
 |---|---|
