@@ -1,0 +1,115 @@
+{
+ "note": "Màu lấy trung vị ô 9x9 px tại cùng vị trí trên A2 (day), A1 (sunset), A3 (night), sau khi đưa về 1920x1080. Bản nháp: Hồng Phúc chỉnh lại khi làm color.ts/dayNight.",
+ "order": [
+  "day",
+  "sunset",
+  "night"
+ ],
+ "colors": {
+  "sky_top": {
+   "day": "#86bff8",
+   "sunset": "#747da1",
+   "night": "#03245b"
+  },
+  "sky_mid": {
+   "day": "#8ec9f9",
+   "sunset": "#e8897a",
+   "night": "#48547f"
+  },
+  "sky_horizon": {
+   "day": "#9fd6f9",
+   "sunset": "#fbae66",
+   "night": "#204285"
+  },
+  "mountain": {
+   "day": "#77b3db",
+   "sunset": "#a0767b",
+   "night": "#0d2e69"
+  },
+  "forest_far": {
+   "day": "#7bb1b6",
+   "sunset": "#847068",
+   "night": "#12356b"
+  },
+  "hills": {
+   "day": "#5b9ba0",
+   "sunset": "#716663",
+   "night": "#0e2f5f"
+  },
+  "canopy": {
+   "day": "#51714a",
+   "sunset": "#3c3c35",
+   "night": "#192b38"
+  },
+  "trunk": {
+   "day": "#654d3e",
+   "sunset": "#493636",
+   "night": "#28222d"
+  },
+  "mushroom_cap": {
+   "day": "#c3574b",
+   "sunset": "#833530",
+   "night": "#5b2034"
+  },
+  "cottage_wall": {
+   "day": "#f9dfb2",
+   "sunset": "#d68858",
+   "night": "#ae8273"
+  },
+  "window": {
+   "day": "#c48f5d",
+   "sunset": "#e37a40",
+   "night": "#f6be61"
+  },
+  "door": {
+   "day": "#d48c58",
+   "sunset": "#a5532f",
+   "night": "#9a5531"
+  },
+  "grass_lit": {
+   "day": "#80a444",
+   "sunset": "#65562f",
+   "night": "#2d4d2f"
+  },
+  "grass_dark": {
+   "day": "#3b7050",
+   "sunset": "#333936",
+   "night": "#0e3746"
+  },
+  "path": {
+   "day": "#f1c791",
+   "sunset": "#dd8754",
+   "night": "#73687b"
+  },
+  "pond": {
+   "day": "#7eb5c2",
+   "sunset": "#b7735a",
+   "night": "#26426c"
+  },
+  "pond_highlight": {
+   "day": "#8a9e96",
+   "sunset": "#dc743e",
+   "night": "#4e4d54"
+  },
+  "rock": {
+   "day": "#d4bfb4",
+   "sunset": "#906c67",
+   "night": "#4b5786"
+  },
+  "bridge": {
+   "day": "#8d6948",
+   "sunset": "#6d3f2c",
+   "night": "#3e2f36"
+  },
+  "foliage_fg": {
+   "day": "#28543a",
+   "sunset": "#2c312f",
+   "night": "#0a2836"
+  },
+  "sun_or_moon": {
+   "day": "#fcf9e2",
+   "sunset": "#fcecac",
+   "night": "#fbe7b2"
+  }
+ }
+}
