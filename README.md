@@ -21,7 +21,7 @@ Bố cục chính thức (toạ độ từng vật thể): [docs/reference/layou
 |---|---|
 | ![](docs/reference/layout/layout_day.png) | ![](docs/reference/layout/layout_night.png) |
 
-Ảnh phác được dựng chỉ bằng elip, đa giác, gradient và trộn alpha, đúng những gì thuật toán của nhóm vẽ được.
+Ảnh phác được dựng chỉ bằng elip, đa giác, gradient và trộn alpha, đúng những gì thuật toán của nhóm vẽ được. Phong cách vẽ (gộp khối, tô 3 tông, **viền bắt buộc cho vật thể tương tác**): [docs/style-guide.md](docs/style-guide.md).
 
 ## Chạy dự án
 

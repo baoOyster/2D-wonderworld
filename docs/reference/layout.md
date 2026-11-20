@@ -2,7 +2,7 @@
 
 Bố cục lấy theo ảnh mẫu (cây lệch trái, nhà nấm nép trong rễ, lối đi lên bậc thềm, hồ và cầu bên phải). Bảng toạ độ dưới đây đã được đưa vào SPEC #1; khi có khác biệt, **SPEC #1 là chuẩn**.
 
-Ảnh phác `layout/layout_day.png`, `layout/layout_night.png` dựng lại bố cục này **chỉ bằng elip, đa giác, gradient và trộn alpha** trên khung 1280×720, tức là đúng những thứ các thuật toán của nhóm vẽ được. Script: `tools/scene_sketch.py`.
+Ảnh phác `layout/layout_day.png`, `layout/layout_night.png` dựng lại bố cục này **chỉ bằng elip, đa giác, gradient và trộn alpha** trên khung 1280×720, tức là đúng những thứ các thuật toán của nhóm vẽ được. Ảnh phác theo phong cách truyện tranh trong [`docs/style-guide.md`](../style-guide.md). Script: `tools/comic_sketch.py`.
 
 | Có chú thích | Ngày | Đêm |
 |---|---|---|
