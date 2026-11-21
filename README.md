@@ -1,7 +1,6 @@
 # Thế giới cổ tích 2D (Fairy Tale World)
 
-Bài tập lớn học phần **Đồ họa máy tính (INFO3019)**, Trường Đại học CMC.
-Chủ đề 4: *Xây dựng ứng dụng mô phỏng vật thể thực tế với đồ họa 2D.*
+Dự án đồ họa 2D của nhóm: dựng một cảnh cổ tích bằng các thuật toán raster tự cài đặt.
 
 Một góc rừng cổ tích 2D, hiển thị Full HD 1920×1080: cây cổ thụ, nhà nấm, hồ nước, cầu gỗ, hoa cỏ, bướm, cá và đom đóm. Người xem có thể chuyển ngày ↔ đêm, nhấn vào vật thể để xem thông tin và thuật toán đã dùng, phóng to/thu nhỏ và kéo khung nhìn.
 
@@ -79,30 +78,30 @@ src/
 | Biến đổi gộp | Cây, nhà nấm, bướm, hàng rào |
 | Bézier *(kiến thức mở rộng)* | Quỹ đạo bay của bướm (de Casteljau) |
 
-Bézier không thuộc 7 chương bắt buộc của học phần; mọi chỗ dùng đều ghi rõ là kiến thức mở rộng.
+Bézier là phần mở rộng, chỉ dùng cho quỹ đạo bay của bướm.
 
 ## Thành viên và phân công
 
-Issue được gán theo label `owner:tvN`. Lọc việc của mình:
+Mỗi người có một label `owner:<tên>`, tự gán issue cho mình khi bắt đầu làm. Lọc việc của mình:
 
 ```bash
-gh issue list --label "owner:tv1" --state open
+gh issue list --label "owner:nguyet" --state open
 ```
 
-| Vai trò | Thành viên | Mảng phụ trách | Issue |
+| Thành viên | Label | Mảng phụ trách | Issue |
 |---|---|---|---|
-| TV1 | Bảo (trưởng nhóm) | Framebuffer, màu, camera/renderer/engine, tích hợp | #2 #8 #26 |
-| TV2 | Quang Anh | Mat3/Node, font, input/chọn vật thể, World, panel/toolbar | #6 #7 #9 #24 #25 |
-| TV3 | Hồng Phúc | Palette/ngày đêm, bầu trời, mây, núi/rừng, hồ, thỏ/chim (tuỳ chọn) | #5 #10 #11 #12 #13 #29 |
-| TV4 | Nguyệt | Raster đường/tròn/elip, cây cổ thụ, nhà nấm, rào/lối đi, hoa/cỏ, nấm/bụi/lá | #3 #14 #15 #16 #17 #18 |
-| TV5 | Thụ | Tô vùng, cầu, đá, cá, bướm (Bézier), đom đóm | #4 #19 #20 #21 #22 #23 |
-| Cả nhóm | | Tài liệu, báo cáo, slide, QA | #1 #27 #28 |
+| Bảo (trưởng nhóm) | `owner:bao` | Framebuffer, màu, presenter, camera, engine, renderer, đá ven hồ, tích hợp | #2 #32 #8 #34 #20 #26 |
+| Quang Anh | `owner:quang-anh` | Mat3/Node, font, scene types, input/chọn vật thể, World, panel | #6 #7 #33 #9 #24 #25 |
+| Hồng Phúc | `owner:hong-phuc` | Palette/ngày đêm, trời, mây, núi/rừng, hồ, nấm/bụi/lá tiền cảnh, thỏ/chim (tuỳ chọn) | #5 #10 #11 #12 #13 #18 #29 |
+| Nguyệt | `owner:nguyet` | Raster đường/tròn/elip, cây cổ thụ, nhà nấm, hàng rào/lối đi, hoa/cỏ | #3 #14 #15 #16 #17 |
+| Thụ | `owner:thu` | Tô vùng, mask/viền, cầu, cá, bướm (Bézier), đom đóm | #4 #19 #21 #22 #23 |
+| Cả nhóm | `owner:all` | SPEC, tài liệu, QA | #1 #27 #28 |
 
-Thứ tự mốc: **M1** nền tảng (#1–#8) → **M2** dựng cảnh tĩnh → **M3** tương tác, hiệu ứng, tài liệu, QA.
+Thứ tự làm và phụ thuộc: xem [issue #1](https://github.com/baoOyster/2D-wonderworld/issues/1) và dòng **Bắt đầu được khi / Merge được khi** trong từng issue.
 
 ## Quy trình làm việc
 
-1. Mỗi issue một nhánh `feat/tvN-ten-ngan`, PR vào `main`, ghi `Closes #<issue>`.
+1. Nhánh đặt theo nội dung, không ghi tên người: `feat/<ten-ngan>`. PR vào `main`; issue có chia phần thì PR phần A ghi `Refs #<issue>`, PR cuối ghi `Closes #<issue>`.
 2. PR cần 1 người khác review, kèm ảnh/GIF và mô tả thuật toán đã dùng.
 3. Không sửa file ngoài vùng của mình (bảng phân vùng ở #1).
 4. Chạy `npm run build` và `npm test` trước khi mở PR.
