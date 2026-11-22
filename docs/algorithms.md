@@ -130,7 +130,88 @@ Các test hiện có:
 
 ## #3 — Raster đường, tròn, ellipse
 
-> Nguyệt cập nhật: DDA, Bresenham, Midpoint circle/ellipse, cách clip và chi phí.
+Người viết: Nguyệt · File `src/core/raster.ts` · Test `tests/raster.test.ts` · Demo `?demo=raster`
+
+Mọi hàm nhận một bề mặt tối thiểu `RasterTarget` (`width`, `height`, `setPixel`, `blendPixel`); `Framebuffer` khớp interface này. Pixel ngoài biên bị bỏ qua (clip), bán kính âm không vẽ gì, không hàm nào throw.
+
+Với màu trong suốt (alpha < 255), mỗi pixel chỉ được trộn **một lần**: hình đặc tô theo dòng quét (mỗi dòng đúng một lần); viền và nét dày có điểm trùng nên được lọc trùng trước khi trộn.
+
+### DDA — `lineDDA`
+
+Bước 1 pixel theo trục dài; trục còn lại cộng dần một số thực rồi làm tròn.
+
+```
+steps = max(|x1 - x0|, |y1 - y0|)
+xi = (x1 - x0) / steps,  yi = (y1 - y0) / steps
+x = x0, y = y0
+lặp steps + 1 lần: plot(round(x), round(y)); x += xi; y += yi
+```
+
+- Độ phức tạp O(max(|dx|, |dy|)); mỗi bước có phép cộng và làm tròn số thực.
+- Dùng cho: ván cầu, gợn sóng hồ, cọng cỏ.
+
+### Bresenham — `lineBresenham`, `bresenhamPoints`
+
+Chỉ dùng số nguyên. Khi |dy| ≤ |dx| (trục x là trục dài), tham số quyết định p cho biết điểm giữa hai ứng viên nằm trên hay dưới đường thẳng thật:
+
+```
+p0 = 2dy - dx
+mỗi bước x += sx:
+  p < 0  → giữ y,        p += 2dy
+  p ≥ 0  → y += sy,      p += 2(dy - dx)
+```
+
+- |dy| > |dx|: đổi vai trò x và y. sx, sy = ±1 cho phép đi theo mọi hướng, nên phủ đủ 8 octant mà không phải đổi chỗ hai đầu mút.
+- Vì sao số nguyên: p là sai số đã nhân 2dx, nên mọi phép tính là cộng/trừ số nguyên, không có làm tròn và không tích luỹ sai số như DDA.
+- Độ phức tạp O(max(|dx|, |dy|)).
+- Test kiểm tra: luôn tô hai đầu mút; đúng max(|dx|,|dy|)+1 pixel; liền mạch; trùng với DDA trên các đoạn không có điểm "đúng nửa pixel"; đảo chiều cho cùng kết quả.
+- Dùng cho: hàng rào, cành cây, râu bướm, viền phiến đá lối đi, chế độ khung dây.
+
+### Nét dày — `thickLine`
+
+Đặt (stamp) một hình tròn đặc đường kính `width` tại mỗi điểm Bresenham. Đầu nét tròn, bề dày đều theo mọi hướng. Độ phức tạp O(L·w²), chấp nhận được vì w nhỏ (cành, cọc, lan can).
+
+### Midpoint đường tròn — `circleMidpoint`, `circleSpans`
+
+Chỉ tính 1/8 cung (0 ≤ x ≤ y), suy ra 7 phần còn lại nhờ đối xứng. d là giá trị hàm f(x, y) = x² + y² − r² tại điểm giữa hai ứng viên E (x+1, y) và SE (x+1, y−1):
+
+```
+x = 0, y = r, d = 1 - r
+while x ≤ y:
+  plot 8 điểm (±x, ±y), (±y, ±x)
+  d < 0  → chọn E:   d += 2x + 3
+  d ≥ 0  → chọn SE:  d += 2(x - y) + 5; y -= 1
+  x += 1
+```
+
+- Hình đặc: từ 8 octant lấy nửa bề rộng lớn nhất ở mỗi độ lệch dọc, rồi tô mỗi dòng quét đúng một lần.
+- Độ phức tạp: viền O(r), đặc O(r²).
+- Dùng cho: mặt trời, mặt trăng, đốm nấm, nhụy hoa, đom đóm, quầng sáng (nhiều vòng đặc trong suốt).
+
+### Midpoint elip — `ellipseMidpoint`, `ellipseSpans`
+
+Tính 1/4 elip, suy ra 3 phần còn lại. Chia hai vùng theo độ dốc: vùng 1 bước theo x (độ dốc > −1, tức 2ry²x < 2rx²y), vùng 2 bước theo y. Tham số được nhân 4 để chỉ dùng số nguyên.
+
+```
+Vùng 1: x = 0, y = ry
+  p1 = ry² - rx²·ry + rx²/4
+  x += 1;  p1 < 0 → p1 += 2ry²x + ry²
+           p1 ≥ 0 → y -= 1; p1 += 2ry²x - 2rx²y + ry²
+Vùng 2:
+  p2 = ry²(x + ½)² + rx²(y - 1)² - rx²ry²
+  y -= 1;  p2 > 0 → p2 += rx² - 2rx²y
+           p2 ≤ 0 → x += 1; p2 += 2ry²x - 2rx²y + rx²
+```
+
+- rx hoặc ry bằng 0 thì elip suy biến thành đoạn thẳng; bán kính rất nhỏ (rx = 1, ry = 60) vẫn kết thúc vì mỗi vòng lặp luôn tiến một bước theo x hoặc y.
+- Hình đặc: tô mỗi dòng quét một lần theo nửa bề rộng lớn nhất của dòng đó.
+- Độ phức tạp: viền O(rx + ry), đặc O(rx·ry).
+- Dùng cho: mây, tán cây, hồ nước, mũ nấm, thân cá, cánh bướm.
+
+### Dùng chung với người khác
+
+- `circleSpans`, `ellipseSpans` trả về từng dòng quét của hình đặc. Thụ dùng để ghi hình tròn/elip vào `Mask` (#4) mà không phải viết lại thuật toán.
+- `bresenhamPoints` trả về từng điểm của đoạn thẳng, dùng cho `strokePolygon` (#4).
 
 ## #4 — Tô vùng & mask
 
