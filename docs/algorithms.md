@@ -139,7 +139,56 @@ Các test hiện có:
 
 ## #6 — Biến đổi 2D
 
-> Quang Anh cập nhật: ma trận column-major, nhân ma trận, nghịch đảo, cây `Node`.
+### Ma trận column-major `Mat3`
+
+9 phần tử, mỗi cột 3 số (đúng SPEC):
+
+```
+| m0 m3 m6 |   x' = m0*x + m3*y + m6
+| m1 m4 m7 |   y' = m1*x + m4*y + m7
+| m2 m5 m8 |   affine: m2 = m5 = 0, m8 = 1
+```
+
+- `mat3Translate(x, y)` → cột cuối `(x, y, 1)`.
+- `mat3Rotate(rad)` → `[[cos, -sin], [sin, cos]]` theo cột; hệ world có `y`
+  hướng xuống nên góc dương xoay theo chiều kim đồng hồ trên màn hình.
+- `mat3Scale(sx, sy)` → nhân hai phần tử chéo.
+
+### Thứ tự nhân
+
+`mat3Multiply(a, b)` = `a * b` — **áp dụng `b` trước rồi `a`**.
+Ví dụ: `multiply(translate, rotate)` = dịch-xoay-quanh-tâm-gốc;
+`multiply(multiply(T, R), S)` chính là `localMatrix()` của `Node` (`T * R * S`).
+
+Nhân không giao hoán (có test chứng minh), nên thứ tự trong SPEC phải giữ nguyên.
+
+### Nghịch đảo
+
+`mat3Invert` dùng adjugate (phụ thức cửu triệu / định thức) trên ma trận
+đại số 3×3 đọc theo hàng từ bộ nhớ column-major. `|det| < 1e-12` → ném lỗi
+(ma trận suy biến, ví dụ `scale(0, 1)`). Test kiểm tra `invert(m) * m ≈ identity`
+với translate/rotate/scale đồng nhất, không đồng nhất và `T*R*S` ghép; plus
+round-trip điểm qua `m` rồi `invert(m)`.
+
+### Cây `Node`
+
+- `localMatrix()` = `T * R * S` (dịch → xoay → tỉ lệ quay tâm gốc cục bộ).
+- `worldMatrix()` = `parent.worldMatrix() * localMatrix()`; đệ quy lên gốc.
+- `add()` giữ `parent` trỏ sẵn nên không cần quét cây; có chặn vòng lặp
+  (thử thêm ông vào con → lỗi) và tự gỡ khỏi cha cũ nếu `add` lại.
+
+### Elip xoay
+
+Không viết lại thuật toán midpoint cho elip xoay: `ellipsePolygon(cx, cy, rx,
+ry, segments)` sample thành đa giác đều (mặc định 32 điểm) → `transformPoints`
+bằng ma trận xoay/dịch → đưa vào `polygonFill`. Test quay elip 60° rồi kiểm
+tra mọi điểm vẫn thỏa `(x/rx)² + (y/ry)² = 1` khi áp nghịch đảo ma trận.
+
+### File
+
+`src/core/mat3.ts`, `src/core/node.ts`; test `tests/mat3.test.ts`,
+`tests/node.test.ts` (theo mẫu `tests/` hiện có — vitest config chỉ include
+`tests/**/*.test.ts`).
 
 ## #7 — Font bitmap tiếng Việt
 
