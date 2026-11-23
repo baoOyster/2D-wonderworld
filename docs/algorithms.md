@@ -216,8 +216,151 @@ Vùng 2:
 
 ## #4 — Tô vùng & mask
 
-> Thụ cập nhật: scanline even-odd, stroke polygon, flood fill, `Mask`, phép
-> hợp/giao/hiệu/dịch, `fillMask`, `outlineMask`.
+### Tổng quan
+
+Mã nguồn: `src/core/mask.ts`, `src/core/fill.ts`
+Kiểm thử: `tests/mask.test.ts`, `tests/fill.test.ts`
+Demo: `src/demo/fill.ts`
+
+Module cung cấp các thuật toán tô vùng và xử lý
+Mask cho các vật thể 2D trong thế giới cổ tích.
+
+### 1. Scanline Even-Odd – polygonFill
+
+Thuật toán tô đa giác theo từng dòng quét ngang.
+
+Các bước:
+1. Xác định khoảng y của đa giác.
+2. Bỏ qua các cạnh nằm ngang.
+3. Tính giao điểm với từng cạnh còn lại.
+4. Sử dụng khoảng half-open để tránh đếm
+   trùng giao điểm tại đỉnh.
+5. Sắp xếp giao điểm theo tọa độ x.
+6. Ghép từng cặp giao điểm và tô các pixel.
+
+Công thức giao điểm:
+
+x = x1 + (ys - y1) * (x2 - x1) / (y2 - y1)
+
+Trong đó ys = y + 0.5 là tọa độ dòng quét
+đi qua tâm pixel.
+
+Hỗ trợ đa giác lồi, lõm và tự cắt theo
+quy tắc Even-Odd.
+
+Độ phức tạp của cách quét trực tiếp:
+O(H * E * log E + P)
+
+H: số dòng quét.
+E: số cạnh.
+P: số pixel được tô.
+
+### 2. Stroke Polygon
+
+Sử dụng lineBresenham cho nét mảnh và
+thickLine cho nét dày.
+
+Các đỉnh được nối lần lượt và đỉnh cuối
+được nối về đỉnh đầu để khép kín đa giác.
+
+Đường viền không tô phần bên trong hình.
+
+### 3. Flood Fill
+
+Sử dụng Stack thay cho đệ quy để tránh
+tràn ngăn xếp lời gọi hàm.
+
+Mỗi pixel được xét theo 4 hướng:
+trái, phải, trên và dưới.
+
+Hai chế độ:
+- target: tô các pixel có cùng màu gốc.
+- boundary: tô đến khi gặp màu biên.
+
+Sử dụng visited để tránh xử lý lặp.
+
+maxPixels giới hạn số pixel được tô,
+ngăn việc tô toàn bộ vùng hở ngoài ý muốn.
+
+Độ phức tạp: O(W * H) trong trường hợp
+xét toàn bộ framebuffer.
+
+### 4. Mask
+
+Mask lưu dữ liệu pixel bằng Uint8Array.
+
+Mỗi phần tử biểu diễn:
+- 0: pixel không thuộc vùng.
+- 1: pixel thuộc vùng.
+
+Các chức năng:
+- maskPolygon: tạo vùng đa giác.
+- maskEllipse: tạo vùng elip bằng Midpoint.
+- maskUnion: hợp hai vùng.
+- maskIntersect: giao hai vùng.
+- maskSubtract: hiệu hai vùng.
+- maskShift: dịch chuyển vùng.
+- maskOutline: tạo đường viền bên trong.
+
+### 5. Fill Mask và Outline Mask
+
+fillMask:
+- Duyệt vùng giới hạn bởi bounds().
+- Chỉ tô các pixel thuộc Mask.
+- Hỗ trợ clip bằng Mask cha.
+- Ghi trực tiếp màu đục hoặc blend alpha.
+
+outlineMask:
+- Tạo đường viền bằng maskOutline.
+- Hỗ trợ độ dày lớn hơn 1 pixel.
+- Không tạo viền giả tại mép ảnh.
+
+Hợp các Mask trước khi tạo viền giúp tránh
+đường viền bên trong vùng chồng nhau.
+
+### 6. So sánh Scanline và Flood Fill
+
+| Tiêu chí | Scanline | Flood Fill |
+|---|---|---|
+| Đầu vào | Đỉnh đa giác | Pixel bắt đầu |
+| Cách tô | Theo dòng ngang | Lan theo 4 hướng |
+| Vùng thích hợp | Đa giác | Vùng liên thông |
+| Dữ liệu hỗ trợ | Giao điểm | Stack, visited |
+| Ứng dụng | Núi, nhà nấm | Hốc cây |
+
+### 7. Kiểm thử
+
+Sử dụng Vitest.
+
+Các trường hợp:
+- Hình vuông, tam giác.
+- Đa giác lõm, ngôi sao tự cắt.
+- Đa giác suy biến.
+- Flood Fill trong vùng kín và vùng hở.
+- Giới hạn maxPixels.
+- Hợp, giao, hiệu và dịch Mask.
+- Viền nhiều lớp, vùng chồng nhau.
+- Clipping tại biên framebuffer.
+
+Lệnh kiểm tra:
+
+`npx vitest run tests/fill.test.ts`
+`npx vitest run tests/mask.test.ts`
+`npm test`
+`npm run build`
+
+### 8. Demo
+
+`src/demo/fill.ts` minh họa:
+- Núi được tô bằng Scanline.
+- Ngôi sao theo quy tắc Even-Odd.
+- Vùng tròn được tô bằng Flood Fill.
+- So sánh viền riêng từng elip với
+  viền chung của Mask hợp.
+
+Demo được tích hợp vào ?demo=fill
+khi Presenter của Issue #32 sẵn sàng.
+
 
 ## #6 — Biến đổi 2D
 
