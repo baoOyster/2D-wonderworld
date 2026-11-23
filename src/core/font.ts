@@ -6,6 +6,8 @@ import {
   CELL_W,
   COMPOSED,
   FALLBACK_CHAR,
+  GLYPH_H,
+  GLYPH_W,
   GLYPHS,
   MODIFIER_ROWS,
   TONE_ROWS,
@@ -24,14 +26,8 @@ export interface DrawTextOptions {
   spacing?: number;
 }
 
-/** Hàng đặt dấu thanh trên (không có dấu phụ). */
-const TONE_TOP = 1;
-/** Hàng đặt dấu thanh trên khi đã có dấu phụ (mũ/breve/horn). */
-const TONE_TOP_STACKED = 0;
-/** Hàng đặt dấu phụ. */
-const MODIFIER_TOP = 2;
-/** Hàng đặt dấu nặng (dưới chân chữ). */
-const DOT_BELOW_TOP = 9;
+/** Chữ `i` mất chấm khi mang dấu thanh, tránh chạm dấu. */
+const DOTLESS_I = 'ı';
 
 /** Chuẩn hoá văn bản về NFC để các ký tự tiếng Việt dựng sẵn khớp bảng ghép dấu. */
 export function normalizeText(text: string): string {
@@ -42,7 +38,7 @@ export function normalizeText(text: string): string {
 export function decompose(char: string): DecomposedGlyph | null {
   const composed = COMPOSED.get(char);
   if (composed) return composed;
-  if (Object.prototype.hasOwnProperty.call(GLYPHS, char)) {
+  if (GLYPHS.has(char)) {
     return { base: char, tone: null, modifier: null };
   }
   return null;
@@ -57,18 +53,100 @@ function toChars(text: string): string[] {
   return Array.from(normalizeText(text));
 }
 
-/** Đo kích thước chuỗi khi vẽ ở `scale`. Toạ độ trả về theo pixel framebuffer. */
-export function measureText(text: string, scale = 1): { width: number; height: number } {
-  const s = Math.max(1, Math.floor(scale));
-  const count = toChars(text).length;
-  return { width: count * CELL_W * s, height: CELL_H * s };
+function normalizeScale(scale: number): number {
+  return Math.max(1, Math.floor(scale));
 }
 
-function blit(
+/**
+ * Đo kích thước chuỗi khi vẽ ở `scale`, tính cả `spacing` giữa các ô.
+ * Toạ độ trả về theo pixel framebuffer.
+ */
+export function measureText(
+  text: string,
+  scale = 1,
+  spacing = 0,
+): { width: number; height: number } {
+  const s = normalizeScale(scale);
+  const gap = Math.max(0, Math.floor(spacing));
+  const count = toChars(text).length;
+  const width = count === 0 ? 0 : (count * CELL_W + (count - 1) * gap) * s;
+  return { width, height: CELL_H * s };
+}
+
+interface GlyphBounds {
+  /** Hàng nội dung trên cùng của glyph gốc (0..15). */
+  top: number;
+  /** Hàng nội dung dưới cùng của glyph gốc (0..15). */
+  bottom: number;
+}
+
+const boundsCache = new Map<string, GlyphBounds>();
+
+function glyphRows(key: string): Uint8Array {
+  return GLYPHS.get(key) ?? GLYPHS.get(FALLBACK_CHAR)!;
+}
+
+function glyphBounds(key: string): GlyphBounds {
+  const cached = boundsCache.get(key);
+  if (cached) return cached;
+  const rows = glyphRows(key);
+  let top = GLYPH_H;
+  let bottom = -1;
+  for (let r = 0; r < GLYPH_H; r++) {
+    if (rows[r] !== 0) {
+      if (top === GLYPH_H) top = r;
+      bottom = r;
+    }
+  }
+  if (bottom < 0) {
+    top = 0;
+    bottom = 0;
+  }
+  const bounds = { top, bottom };
+  boundsCache.set(key, bounds);
+  return bounds;
+}
+
+/** Điền một khối `scale × scale` pixel. */
+function block(
+  fb: Framebuffer,
+  px: number,
+  py: number,
+  color: RGBA,
+  scale: number,
+): void {
+  for (let dy = 0; dy < scale; dy++) {
+    for (let dx = 0; dx < scale; dx++) {
+      fb.blendPixel(px + dx, py + dy, color);
+    }
+  }
+}
+
+function blitGlyph(
+  fb: Framebuffer,
+  rows: Uint8Array,
+  x0: number,
+  y0: number,
+  color: RGBA,
+  scale: number,
+): void {
+  for (let r = 0; r < GLYPH_H; r++) {
+    const byte = rows[r];
+    if (byte === 0) continue;
+    for (let c = 0; c < GLYPH_W; c++) {
+      if ((byte & (1 << (GLYPH_W - 1 - c))) === 0) continue;
+      block(fb, x0 + c * scale, y0 + r * scale, color, scale);
+    }
+  }
+}
+
+/** Vẽ bitmap dấu; `topRow` là hàng ô (tuyệt đối trong cell) của hàng dấu đầu. */
+function blitMark(
   fb: Framebuffer,
   rows: readonly string[],
   x0: number,
-  y0: number,
+  textY: number,
+  topRow: number,
   color: RGBA,
   scale: number,
 ): void {
@@ -76,13 +154,7 @@ function blit(
     const row = rows[r];
     for (let c = 0; c < row.length; c++) {
       if (row.charCodeAt(c) !== 35 /* '#' */) continue;
-      const px = x0 + c * scale;
-      const py = y0 + r * scale;
-      for (let dy = 0; dy < scale; dy++) {
-        for (let dx = 0; dx < scale; dx++) {
-          fb.blendPixel(px + dx, py + dy, color);
-        }
-      }
+      block(fb, x0 + c * scale, textY + (topRow + r) * scale, color, scale);
     }
   }
 }
@@ -95,19 +167,26 @@ function drawGlyph(
   color: RGBA,
   scale: number,
 ): void {
-  const base = GLYPHS[glyph.base] ?? GLYPHS[FALLBACK_CHAR];
-  blit(fb, base, x, y + BASE_TOP * scale, color, scale);
+  const key = glyph.base === 'i' && glyph.tone !== null ? DOTLESS_I : glyph.base;
+  const rows = glyphRows(key);
+  const bounds = glyphBounds(key);
+  const textY = y + BASE_TOP * scale;
+  blitGlyph(fb, rows, x, textY, color, scale);
 
+  let modifierTop: number | null = null;
   if (glyph.modifier) {
-    const top = glyph.modifier === 'horn' ? MODIFIER_TOP + 1 : MODIFIER_TOP;
-    blit(fb, MODIFIER_ROWS[glyph.modifier], x, y + top * scale, color, scale);
+    const contentTop = BASE_TOP + bounds.top;
+    const bottom = glyph.modifier === 'horn' ? contentTop - 1 : contentTop - 2;
+    modifierTop = bottom - 1;
+    blitMark(fb, MODIFIER_ROWS[glyph.modifier], x, y, modifierTop, color, scale);
   }
 
   if (glyph.tone === 'dot') {
-    blit(fb, TONE_ROWS.dot, x, y + DOT_BELOW_TOP * scale, color, scale);
+    const topRow = BASE_TOP + bounds.bottom + 1;
+    blitMark(fb, TONE_ROWS.dot, x, y, topRow, color, scale);
   } else if (glyph.tone) {
-    const top = glyph.modifier ? TONE_TOP_STACKED : TONE_TOP;
-    blit(fb, TONE_ROWS[glyph.tone], x, y + top * scale, color, scale);
+    const bottom = modifierTop === null ? BASE_TOP + bounds.top - 2 : modifierTop - 2;
+    blitMark(fb, TONE_ROWS[glyph.tone], x, y, bottom - 1, color, scale);
   }
 }
 
@@ -132,7 +211,8 @@ function pass(
  * Vẽ chữ lên framebuffer bằng pixel (không dùng `ctx.fillText`).
  *
  * `x, y` là góc trên-trái của ô ký tự đầu tiên. Với `align` khác `left`, `x`
- * được hiểu là mép trái / tâm / mép phải của cả chuỗi. Trả về bề rộng đã vẽ.
+ * được hiểu là mép trái / tâm / mép phải của cả chuỗi. Trả về kích thước đã vẽ
+ * (đã tính `spacing`).
  */
 export function drawText(
   fb: Framebuffer,
@@ -142,10 +222,10 @@ export function drawText(
   color: RGBA,
   opts: DrawTextOptions = {},
 ): { width: number; height: number } {
-  const scale = Math.max(1, Math.floor(opts.scale ?? 1));
-  const spacing = opts.spacing ?? 0;
+  const scale = normalizeScale(opts.scale ?? 1);
+  const spacing = Math.max(0, Math.floor(opts.spacing ?? 0));
   const chars = toChars(text);
-  const size = measureText(text, scale);
+  const size = measureText(text, scale, spacing);
   const advance = (CELL_W + spacing) * scale;
 
   let startX = x;
