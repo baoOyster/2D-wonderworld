@@ -1,5 +1,6 @@
 
 import type { Vec2 } from './vec2.ts';
+import { ellipseSpans } from './raster.ts';
 
 export class Mask {
   readonly width: number;
@@ -45,23 +46,36 @@ export class Mask {
   }
 
   bounds() {
-    let x0 = this.width;
-    let y0 = this.height;
+    const { width: w, height: h, data } = this;
+
+    // Dòng trên cùng và dưới cùng có pixel: quét từ hai đầu, gặp là dừng
+    const rowEmpty = (y: number): boolean => {
+      for (let i = y * w; i < (y + 1) * w; i++) if (data[i] !== 0) return false;
+      return true;
+    };
+
+    let y0 = 0;
+    while (y0 < h && rowEmpty(y0)) y0++;
+    if (y0 === h) return null;
+
+    let y1 = h - 1;
+    while (rowEmpty(y1)) y1--;
+
+    // Cột trái/phải: mỗi dòng chỉ cần xét phần nằm ngoài [x0, x1] hiện có
+    let x0 = w;
     let x1 = -1;
-    let y1 = -1;
 
-    for (let y = 0; y < this.height; y++) {
-      for (let x = 0; x < this.width; x++) {
-        if (!this.get(x, y)) continue;
-
-        x0 = Math.min(x0, x);
-        y0 = Math.min(y0, y);
-        x1 = Math.max(x1, x);
-        y1 = Math.max(y1, y);
+    for (let y = y0; y <= y1; y++) {
+      const row = y * w;
+      for (let x = 0; x < x0; x++) {
+        if (data[row + x] !== 0) { x0 = x; break; }
+      }
+      for (let x = w - 1; x > x1; x--) {
+        if (data[row + x] !== 0) { x1 = x; break; }
       }
     }
 
-    return x1 < 0 ? null : { x0, y0, x1, y1 };
+    return { x0, y0, x1, y1 };
   }
 }
 
@@ -109,21 +123,27 @@ export function maskShift(
   dx: number,
   dy: number
 ): Mask {
-  const result = new Mask(m.width, m.height);
+  const { width: w, height: h } = m;
+  const result = new Mask(w, h);
   const sx = Math.round(dx);
   const sy = Math.round(dy);
 
-  for (let y = 0; y < m.height; y++) {
-    for (let x = 0; x < m.width; x++) {
-      const sourceX = Math.max(
-        0, Math.min(m.width - 1, x - sx)
-      );
-      const sourceY = Math.max(
-        0, Math.min(m.height - 1, y - sy)
-      );
+  // Cột đích x lấy từ cột nguồn x - sx; chỉ [lo, hi) có nguồn nằm trong ảnh
+  const lo = Math.max(0, Math.min(w, sx));
+  const hi = Math.max(0, Math.min(w, w + sx));
 
-      result.set(x, y, m.get(sourceX, sourceY));
+  for (let y = 0; y < h; y++) {
+    const src = Math.max(0, Math.min(h - 1, y - sy)) * w;
+    const dst = y * w;
+
+    // Phần giữa: chép nguyên đoạn
+    if (lo < hi) {
+      result.data.set(m.data.subarray(src + lo - sx, src + hi - sx), dst + lo);
     }
+
+    // Phần trống bên trái/phải: lặp lại pixel mép để không tạo dải lạ
+    if (lo > 0) result.data.fill(m.data[src], dst, dst + lo);
+    if (hi < w) result.data.fill(m.data[src + w - 1], dst + hi, dst + w);
   }
 
   return result;
@@ -183,6 +203,8 @@ export function maskPolygon(
 
 
 
+// Midpoint ellipse filled: dùng chung ellipseSpans của raster.ts (#3),
+// ghi từng đoạn ngang vào mask, kẹp theo biên ảnh
 export function maskEllipse(
   m: Mask,
   cx: number,
@@ -191,123 +213,83 @@ export function maskEllipse(
   ry: number
 ): void {
   if (![cx, cy, rx, ry].every(Number.isFinite)) return;
+  if (Math.round(rx) <= 0 || Math.round(ry) <= 0) return;
 
-  // Raster hóa trên lưới pixel nguyên
-  cx = Math.round(cx);
-  cy = Math.round(cy);
-  rx = Math.round(rx);
-  ry = Math.round(ry);
+  ellipseSpans(cx, cy, rx, ry, (y, x0, x1) => {
+    if (y < 0 || y >= m.height) return;
 
-  if (rx <= 0 || ry <= 0) return;
+    const left = Math.max(0, x0);
+    const right = Math.min(m.width - 1, x1);
 
-  let x = 0;
-  let y = ry;
-
-  const rx2 = rx * rx;
-  const ry2 = ry * ry;
-
-  let dx = 2 * ry2 * x;
-  let dy = 2 * rx2 * y;
-
-  // Mỗi dòng lưu biên trái/phải cần tô
-  const spans = new Map<number, number>();
-
-  function record(px: number, py: number): void {
-    for (const yy of [cy + py, cy - py]) {
-      if (yy < 0 || yy >= m.height) continue;
-
-      const previous = spans.get(yy) ?? -1;
-      spans.set(yy, Math.max(previous, px));
+    if (left <= right) {
+      m.data.fill(1, y * m.width + left, y * m.width + right + 1);
     }
-  }
-
-  // Vùng 1: độ dốc |m| < 1
-  let p1 = ry2 - rx2 * ry + 0.25 * rx2;
-
-  while (dx < dy) {
-    record(x, y);
-
-    x++;
-    dx += 2 * ry2;
-
-    if (p1 < 0) {
-      p1 += ry2 + dx;
-    } else {
-      y--;
-      dy -= 2 * rx2;
-      p1 += ry2 + dx - dy;
-    }
-  }
-
-  // Vùng 2: độ dốc |m| >= 1
-  let p2 =
-    ry2 * (x + 0.5) ** 2 +
-    rx2 * (y - 1) ** 2 -
-    rx2 * ry2;
-
-  while (y >= 0) {
-    record(x, y);
-
-    y--;
-    dy -= 2 * rx2;
-
-    if (p2 > 0) {
-      p2 += rx2 - dy;
-    } else {
-      x++;
-      dx += 2 * ry2;
-      p2 += rx2 - dy + dx;
-    }
-  }
-
-  // Tô kín từng dòng ngang
-  for (const [row, halfWidth] of spans) {
-    const left = Math.max(0, cx - halfWidth);
-    const right = Math.min(m.width - 1, cx + halfWidth);
-
-    for (let col = left; col <= right; col++) {
-      m.set(col, row, true);
-    }
-  }
+  });
 }
 
 
+// Viền bên trong vùng: lớp 1 là pixel thuộc vùng có láng giềng 4 hướng
+// nằm ngoài vùng; width > 1 thì bóc tiếp lớp biên (co vùng / erosion) width lần.
+// Pixel ngoài khung ảnh được coi là "trong vùng": vật bị khung hình cắt
+// (tán cây chạm mép trên) vẫn liền ra ngoài, nên không có viền dọc mép ảnh.
 export function maskOutline(
   m: Mask,
   width = 1
 ): Mask {
-  const result = new Mask(m.width, m.height);
-
   if (!Number.isInteger(width) || width < 1) {
     throw new RangeError('Invalid outline width');
   }
 
-  // Tạo vùng còn lại sau mỗi lần bóc lớp biên
-  let current = new Mask(m.width, m.height);
-  current.data.set(m.data);
+  const { width: w, height: h } = m;
+  const result = new Mask(w, h);
+  const b = m.bounds();
+
+  if (!b) return result;
+  const { x0, y0, x1, y1 } = b;
+  const bw = x1 - x0 + 1;
+  const bh = y1 - y0 + 1;
+
+  // Chỉ làm việc trong hộp bao: chép phần đó của mask ra mảng nhỏ
+  let current = new Uint8Array(bw * bh);
+  let inner = new Uint8Array(bw * bh);
+
+  for (let y = y0; y <= y1; y++) {
+    current.set(m.data.subarray(y * w + x0, y * w + x1 + 1), (y - y0) * bw);
+  }
+
+  // Láng giềng nằm ngoài hộp bao: ngoài ảnh thì coi là trong vùng (1),
+  // còn trong ảnh thì chắc chắn ngoài vùng (0) vì hộp bao đã bao hết mask
+  const leftOut = x0 === 0 ? 1 : 0;
+  const rightOut = x1 === w - 1 ? 1 : 0;
+  const topOut = y0 === 0 ? 1 : 0;
+  const bottomOut = y1 === h - 1 ? 1 : 0;
 
   for (let step = 0; step < width; step++) {
-    const inner = new Mask(m.width, m.height);
+    for (let j = 0; j < bh; j++) {
+      for (let k = 0; k < bw; k++) {
+        const i = j * bw + k;
 
-    for (let y = 0; y < m.height; y++) {
-      for (let x = 0; x < m.width; x++) {
-        if (!current.get(x, y)) continue;
+        if (current[i] === 0) {
+          inner[i] = 0;
+          continue;
+        }
 
         const inside =
-          current.get(x - 1, y) &&
-          current.get(x + 1, y) &&
-          current.get(x, y - 1) &&
-          current.get(x, y + 1);
+          (k === 0 ? leftOut : current[i - 1]) &&
+          (k === bw - 1 ? rightOut : current[i + 1]) &&
+          (j === 0 ? topOut : current[i - bw]) &&
+          (j === bh - 1 ? bottomOut : current[i + bw]);
 
         if (inside) {
-          inner.set(x, y);
+          inner[i] = 1;
         } else {
-          result.set(x, y);
+          inner[i] = 0;
+          result.data[(y0 + j) * w + x0 + k] = 1;
         }
       }
     }
 
-    current = inner;
+    [current, inner] = [inner, current];
   }
 
   return result;

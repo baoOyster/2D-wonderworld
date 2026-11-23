@@ -1,5 +1,6 @@
 
 import { describe, it, expect } from 'vitest';
+import { ellipseSpans } from '../src/core/raster.ts';
 
 import {
   Mask,
@@ -183,5 +184,88 @@ describe('Mask shift edge cases', () => {
     expect(shifted.get(15, 10)).toBe(true);
     expect(shifted.get(10, 10)).toBe(false);
     expect(shifted.get(0, 10)).toBe(false);
+  });
+});
+
+
+describe('Mask edge cases (fix review #40)', () => {
+  const count = (m: Mask): number => {
+    let c = 0;
+    for (const v of m.data) if (v !== 0) c++;
+    return c;
+  };
+
+  it('does not draw an outline along the image border', () => {
+    // Tán cây chạm mép trên: phần bị khung hình cắt không được có viền
+    const m = new Mask(200, 100);
+    maskEllipse(m, 100, 0, 60, 40);
+
+    const outline = maskOutline(m, 2);
+
+    for (let x = 50; x <= 150; x++) {
+      expect(outline.get(x, 0)).toBe(false);
+      expect(outline.get(x, 1)).toBe(false);
+    }
+    // Phía dưới (biên thật của tán) vẫn có viền
+    expect(outline.get(100, 40)).toBe(true);
+  });
+
+  it('keeps a full-image mask without outline', () => {
+    const m = new Mask(8, 6);
+    m.data.fill(1);
+
+    expect(maskOutline(m, 2).bounds()).toBeNull();
+  });
+
+  it('outline of width 2 stays inside the mask', () => {
+    const m = new Mask(10, 10);
+    for (let y = 2; y <= 6; y++) {
+      for (let x = 2; x <= 6; x++) m.set(x, y);
+    }
+
+    const outline = maskOutline(m, 2);
+
+    // 5x5: lớp ngoài 16 pixel + lớp trong 8 pixel, tâm (4,4) không phải viền
+    expect(count(outline)).toBe(24);
+    expect(outline.get(4, 4)).toBe(false);
+    expect(count(maskSubtract(outline, m))).toBe(0);
+  });
+
+  it('replicates the edge pixel when shifting', () => {
+    const m = new Mask(10, 10);
+    for (let y = 2; y <= 4; y++) m.set(0, y);
+
+    const right = maskShift(m, 3, 0);
+    for (let x = 0; x <= 3; x++) expect(right.get(x, 3)).toBe(true);
+    expect(right.get(4, 3)).toBe(false);
+
+    const down = maskShift(m, 0, 20);
+    expect(down.bounds()).toBeNull();
+  });
+
+  it('finds bounds at the corners', () => {
+    const m = new Mask(30, 20);
+    m.set(0, 19);
+    m.set(29, 0);
+
+    expect(m.bounds()).toEqual({ x0: 0, y0: 0, x1: 29, y1: 19 });
+  });
+
+  it('maskEllipse matches ellipseSpans and clips at the border', () => {
+    const m = new Mask(100, 80);
+    maskEllipse(m, 50, 40, 30, 20);
+
+    let expected = 0;
+    ellipseSpans(50, 40, 30, 20, (_y, x0, x1) => { expected += x1 - x0 + 1; });
+    expect(count(m)).toBe(expected);
+
+    const edge = new Mask(100, 80);
+    maskEllipse(edge, -10, 75, 40, 30);
+    expect(edge.get(0, 79)).toBe(true);
+    expect(edge.get(99, 0)).toBe(false);
+
+    const none = new Mask(10, 10);
+    maskEllipse(none, 5, 5, 0, 4);
+    expect(none.bounds()).toBeNull();
   });
 });
