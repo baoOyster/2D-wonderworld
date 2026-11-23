@@ -274,33 +274,43 @@ tra mọi điểm vẫn thỏa `(x/rx)² + (y/ry)² = 1` khi áp nghịch đảo
 
 ## #7 — Font bitmap tiếng Việt
 
-Font tự thiết kế ngay trong repo (không copy bộ ngoài nên không cần license).
+### Nguồn & giấy phép
+
+Glyph cơ sở trích từ **Terminus Bold 8×16** — Copyright (C) 2020
+Dimitar Toshkov Zhekov, phát hành theo **SIL Open Font License 1.1**
+(ghi rõ trong header `font-data.ts`). Nhóm chỉ lấy glyph **không dấu**
+(ASCII + `Đ`/`đ`) và hình các dấu sắc/huyền/ngã/mũ/breve; dấu hỏi, dấu nặng,
+móc `ơ`/`ư` và **toàn bộ thuật toán ghép dấu** là của nhóm.
 
 ### Cấu trúc ô ký tự
 
-- Ô (cell) **6×11**: glyph cơ sở **5×7** cộng 1 cột khoảng cách bên phải.
-- Glyph cơ sở đặt ở hàng 2…8 của cell (`BASE_TOP = 2`).
-- Vùng dấu trên:
-  - dấu thanh (sắc/huyền/hỏi/ngã) ở hàng 1–2, hoặc hàng 0–1 khi có dấu phụ;
-  - dấu phụ (mũ `^`, breve `˘`, horn) ở hàng 2–3 (horn nhích xuống hàng 3–4).
-- Dấu nặng (`.`) ở hàng 9, ngay dưới baseline (hàng 8) → chữ `ạ ặ ậ …` vẫn
-  cùng baseline với `a`.
-- Chữ thường không bụng trên (a c e m n o …) chỉ dùng hàng 2…6 nên vùng
-  hàng 0–1 trống, đủ chỗ cho dấu.
+- Ô (cell) **8×22**: glyph gốc **8×16** đặt ở hàng 4…19 (`BASE_TOP = 4`).
+- Vùng trên (hàng 0…3) cho dấu; vùng dưới (hàng 20…21) cho dấu nặng của
+  chữ có đuôi.
+- Dấu được xếp theo **hàng nội dung thực** của chữ cơ sở (quét bitmap tìm
+  `top`/`bottom`), không dùng hằng số cố định:
+  - dấu phụ (mũ/breve) đặt trên `top`, cách 1 hàng trống; móc horn sát `top`;
+  - dấu thanh đặt trên dấu phụ **cách 1 hàng trống**, hoặc trên `top` − 1 hàng
+    trống nếu không có dấu phụ;
+  - dấu nặng đặt dưới `bottom` + 1 hàng, độc lập với dấu phụ nên `ặ ậ ộ …`
+    vừa có dấu trên vừa có dấu dưới.
+- Khi `i` mang dấu thanh, dùng glyph **`ı` (i không chấm)** để dấu không chạm
+  chấm.
 
-Mỗi glyph là 7 chuỗi 5 ký tự `#`/`.` trong `font-data.ts`; test kiểm tra mọi
-glyph đúng 7×5 và chỉ chứa hai ký tự này.
+Glyph gốc lưu dạng **16 byte** (mỗi hàng 1 byte, bit cao là cột trái) trong
+`GLYPH_HEX`, giải mã một lần thành `Uint8Array`; test kiểm tra đúng 16 hàng,
+dấu rộng 8 cột.
 
 ### Ghép dấu tiếng Việt
 
 - `normalizeText` chuẩn hoá **NFC** để `e + ̂ + ́` → `ế`, khớp bảng dựng sẵn.
-- 12 họ nguyên âm × 6 biến thể (không dấu, sắc, huyền, hỏi, ngã, nặng) được
-  khai báo một lần trong `VOWEL_GROUPS`, duyệt để dựng `COMPOSED`
-  (`Map<char, {base, tone, modifier}>`).
+- 24 họ nguyên âm (12 thường + 12 hoa) × 6 biến thể (không dấu, sắc, huyền,
+  hỏi, ngã, nặng) khai báo một lần trong `VOWEL_GROUPS`, duyệt để dựng
+  `COMPOSED` (`Map<char, {base, tone, modifier}>`).
 - `decompose(char)` tra `COMPOSED` trước, rồi tới `GLYPHS` (ASCII + `đ/Đ`).
   Không có → trả `null` để nơi vẽ dùng fallback `?`.
-- Nhờ tách lớp, chỉ cần **11 glyph nguyên âm** + dấu rời là vẽ được toàn bộ
-  ~90 ký tự tiếng Việt thường dùng, thay vì vẽ tay từng ký tự dựng sẵn.
+- Nhờ tách lớp, chỉ cần **glyph nguyên âm + dấu rời** là vẽ được cả chữ
+  thường lẫn chữ hoa có dấu, thay vì vẽ tay từng ký tự dựng sẵn.
 
 ### Vẽ & đo
 
@@ -310,19 +320,21 @@ glyph đúng 7×5 và chỉ chứa hai ký tự này.
 - `align`: `left | center | right` dịch `startX` theo bề rộng cả chuỗi;
   `spacing` cộng thêm pixel giữa các ô; `shadow` vẽ một lượt màu bóng lệch
   `1` pixel font (× scale) xuống phải **trước** lượt chữ chính.
-- `measureText(text, scale)` = `{ width: n·6·scale, height: 11·scale }`.
+- `measureText(text, scale, spacing)` = `{ width: (n·8 + (n−1)·spacing)·scale,
+  height: 22·scale }` — **tính cả `spacing`**, nên căn giữa/phải khớp với
+  `drawText` (đã sửa lỗi cũ bỏ qua `spacing`).
 
 ### Độ phức tạp
 
 Tra glyph và ghép dấu `O(1)` mỗi ký tự (hash map). Vẽ `O(bật · scale²)` trên
-mỗi ký tự, `bật` ≈ số pixel `#` của glyph (khoảng 10–20). Đo `O(n)`.
+mỗi ký tự, `bật` ≈ số pixel bật của glyph (khoảng 20–45 với 8×16). Đo `O(n)`.
 
 ### Thêm ký tự mới
 
-- Ký tự thường: thêm một entry 7×5 vào `GLYPHS`.
+- Ký tự thường: thêm một entry hex 32 ký tự (8×16) vào `GLYPH_HEX`.
 - Nguyên âm có dấu: thêm vào họ tương ứng trong `VOWEL_GROUPS` (đúng thứ tự
-  không dấu → sắc → huyền → hỏi → ngã → nặng) hoặc vào `GLYPHS` nếu là glyph
-  đặc biệt như `đ`/`Đ`.
+  không dấu → sắc → huyền → hỏi → ngã → nặng) hoặc vào `GLYPH_HEX` nếu là
+  glyph đặc biệt như `đ`/`Đ`.
 
 ### File
 

@@ -50,7 +50,7 @@ Hiển thị **Full HD 1920×1080** nhưng **giữ toạ độ thế giới 1280
 
 - `Framebuffer` 1920×1080; `Camera.matrix() = scale(RENDER_SCALE) · translate(pan) · scale(zoom)`, với `RENDER_SCALE = FB_WIDTH / 1280`. Object vẫn vẽ ở toạ độ 1280×720, `screenToWorld` chia lại nên hit-test không đổi.
 - Bán kính, độ dày nét nhân theo `RENDER_SCALE · zoom` (renderer đã làm việc này cho `zoom`).
-- Overlay (chữ, viền chọn) dùng `scale(RENDER_SCALE)`; font 6×10 vẽ ở scale ≥ 2 để đọc được.
+- Overlay (chữ, viền chọn) dùng `scale(RENDER_SCALE)`; font 8×22 (ô ký tự) vẽ ở scale ≥ 2 để đọc được.
 - CSS: bỏ `image-rendering: pixelated`, dùng mặc định cho mượt.
 - Hiệu năng: số pixel gấp 2,25 lần. **Cache lớp tĩnh** (trời, núi, rừng, đất) là bắt buộc, không còn là tuỳ chọn ở #26; vẽ lại cache khi palette đổi hoặc khi zoom/pan.
 - Để `RENDER_SCALE` là hằng số: máy yếu đặt 1 (1280×720), màn hình lớn thử 2 (2560×1440).
