@@ -54,7 +54,7 @@ r.shape(spots, { fill: p.mushroomSpot, clip: capMask });
 | Vẽ hình vào Mask | scanline polygon fill, midpoint ellipse (ghi vào Mask thay cho Framebuffer) | `core/mask.ts` (#4) |
 | Tô vùng Mask | quét từng dòng các pixel thuộc Mask | `core/mask.ts` (#4) |
 | Tông tối / sáng | phép toán tập hợp trên Mask: giao, hiệu, tịnh tiến | `core/mask.ts` (#4) |
-| Viền | pixel thuộc Mask có ít nhất một láng giềng 4 hướng nằm ngoài Mask; độ dày `w` bằng `w` lần nở vùng (dilation) | `core/mask.ts` (#4) |
+| Viền | pixel thuộc Mask có ít nhất một láng giềng 4 hướng nằm ngoài Mask (pixel ngoài khung ảnh tính là trong Mask, nên vật bị khung cắt không có viền ở mép); độ dày `w` bằng bóc `w` lớp biên (co vùng, erosion), viền nằm **bên trong** khối | `core/mask.ts` (#4) |
 | Cắt chi tiết trong khối cha | clipping theo Mask | `core/mask.ts` (#4) |
 | API gọn cho vật thể | `Renderer.mask()`, `Renderer.shape()` | `core/renderer.ts` (#8) |
 
