@@ -118,7 +118,7 @@ describe('font-data toàn vẹn', () => {
     expect(GLYPH_W).toBe(8);
     expect(GLYPH_H).toBe(16);
     expect(CELL_W).toBe(8);
-    expect(CELL_H).toBe(22);
+    expect(CELL_H).toBe(23);
     for (const [char, rows] of GLYPHS) {
       expect(rows, `glyph "${char}"`).toBeInstanceOf(Uint8Array);
       expect(rows, `glyph "${char}"`).toHaveLength(GLYPH_H);
@@ -127,14 +127,16 @@ describe('font-data toàn vẹn', () => {
 
   it('mọi bitmap dấu rộng 8 cột và không chứa ký tự lạ', () => {
     for (const rows of Object.values(TONE_ROWS)) {
-      expect(rows).toHaveLength(2);
+      expect(rows.length).toBeGreaterThanOrEqual(2);
+      expect(rows.length).toBeLessThanOrEqual(3);
       for (const row of rows) {
         expect(row).toHaveLength(8);
         expect(/^[.#]+$/.test(row), `dấu lạ: ${row}`).toBe(true);
       }
     }
     for (const rows of Object.values(MODIFIER_ROWS)) {
-      expect(rows).toHaveLength(2);
+      expect(rows.length).toBeGreaterThanOrEqual(2);
+      expect(rows.length).toBeLessThanOrEqual(3);
       for (const row of rows) {
         expect(row).toHaveLength(8);
         expect(/^[.#]+$/.test(row), `dấu lạ: ${row}`).toBe(true);
@@ -243,27 +245,64 @@ describe('drawText', () => {
     expect(minY(both)).toBe(minY(breve));
     expect(maxY(both)).toBeGreaterThan(maxY(breve));
     const art = toAscii('ặ');
-    expect(art[6]).toContain('#');
-    expect(art[16]).toContain('#');
+    expect(art[7]).toContain('#');
+    expect(art[18]).toContain('#');
+    // dấu nặng cách chân chữ 1 hàng trống
+    expect(art[17]).not.toContain('#');
   });
 
   it('hai dấu xếp chồng cách nhau một hàng trống', () => {
     const art = toAscii('ế');
-    expect(art[3]).toContain('#');
-    expect(art[6]).toContain('#');
-    expect(art[5]).not.toContain('#');
-    expect(art[8]).not.toContain('#');
+    expect(art[4]).toContain('#');
+    expect(art[7]).toContain('#');
+    expect(art[6]).not.toContain('#');
+    expect(art[9]).not.toContain('#');
   });
 
   it('dấu của chữ hoa có dấu vẫn nằm trong ô', () => {
     const art = toAscii('Ế');
-    expect(art[0]).toContain('#');
+    expect(art[1]).toContain('#');
+    // dấu hỏi cao 3 hàng trên dấu mũ vẫn vừa ô
+    expect(toAscii('Ổ')[0]).toContain('#');
     expect(art.length).toBe(CELL_H);
   });
 
   it('móc ơ/ư nằm trên chữ cái', () => {
     expect(minY(litPixels(render('ơ')))).toBeLessThan(minY(litPixels(render('o'))));
     expect(minY(litPixels(render('ư')))).toBeLessThan(minY(litPixels(render('u'))));
+  });
+
+  it('dấu hỏi khác dấu sắc và dấu huyền', () => {
+    const hook = litPixels(render('ả'));
+    expect(hook).not.toEqual(litPixels(render('á')));
+    expect(hook).not.toEqual(litPixels(render('à')));
+  });
+
+  it('móc ơ/ư dính vào vai phải chữ', () => {
+    for (const [plain, horn] of [['o', 'ơ'], ['u', 'ư'], ['O', 'Ơ'], ['U', 'Ư']]) {
+      const art = toAscii(horn);
+      const top = toAscii(plain).findIndex((row) => row.includes('#'));
+      // móc nằm ngay trên vai phải: 2 hàng sát trên chữ có pixel ở nửa phải
+      expect(art[top - 1].lastIndexOf('#'), horn).toBeGreaterThanOrEqual(5);
+      expect(art[top - 2].lastIndexOf('#'), horn).toBeGreaterThanOrEqual(5);
+      expect(art[top - 1].slice(0, 5), horn).not.toContain('#');
+    }
+  });
+
+  it('i giữ chấm khi mang dấu nặng, mất chấm khi có dấu phía trên', () => {
+    const dotted = toAscii('i');
+    const top = dotted.findIndex((row) => row.includes('#'));
+    expect(toAscii('ị')[top]).toEqual(dotted[top]);
+    // í dùng ı: giữa chấm cũ và dấu sắc phải có 1 hàng trống, không dính
+    const acute = toAscii('í');
+    const stem = toAscii('ı').findIndex((row) => row.includes('#'));
+    expect(acute[stem - 1]).not.toContain('#');
+  });
+
+  it('có glyph cho — · … và ngoặc kép cong', () => {
+    for (const char of ['—', '–', '·', '…', '°', '“', '”', '‘', '’']) {
+      expect(hasGlyph(char), char).toBe(true);
+    }
   });
 
   it('Đ khác D, đ khác d (không còn giống nhau)', () => {
