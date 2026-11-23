@@ -274,7 +274,59 @@ tra mọi điểm vẫn thỏa `(x/rx)² + (y/ry)² = 1` khi áp nghịch đảo
 
 ## #7 — Font bitmap tiếng Việt
 
-> Quang Anh cập nhật: bảng glyph, ghép dấu, cách vẽ chữ lên framebuffer.
+Font tự thiết kế ngay trong repo (không copy bộ ngoài nên không cần license).
+
+### Cấu trúc ô ký tự
+
+- Ô (cell) **6×11**: glyph cơ sở **5×7** cộng 1 cột khoảng cách bên phải.
+- Glyph cơ sở đặt ở hàng 2…8 của cell (`BASE_TOP = 2`).
+- Vùng dấu trên:
+  - dấu thanh (sắc/huyền/hỏi/ngã) ở hàng 1–2, hoặc hàng 0–1 khi có dấu phụ;
+  - dấu phụ (mũ `^`, breve `˘`, horn) ở hàng 2–3 (horn nhích xuống hàng 3–4).
+- Dấu nặng (`.`) ở hàng 9, ngay dưới baseline (hàng 8) → chữ `ạ ặ ậ …` vẫn
+  cùng baseline với `a`.
+- Chữ thường không bụng trên (a c e m n o …) chỉ dùng hàng 2…6 nên vùng
+  hàng 0–1 trống, đủ chỗ cho dấu.
+
+Mỗi glyph là 7 chuỗi 5 ký tự `#`/`.` trong `font-data.ts`; test kiểm tra mọi
+glyph đúng 7×5 và chỉ chứa hai ký tự này.
+
+### Ghép dấu tiếng Việt
+
+- `normalizeText` chuẩn hoá **NFC** để `e + ̂ + ́` → `ế`, khớp bảng dựng sẵn.
+- 12 họ nguyên âm × 6 biến thể (không dấu, sắc, huyền, hỏi, ngã, nặng) được
+  khai báo một lần trong `VOWEL_GROUPS`, duyệt để dựng `COMPOSED`
+  (`Map<char, {base, tone, modifier}>`).
+- `decompose(char)` tra `COMPOSED` trước, rồi tới `GLYPHS` (ASCII + `đ/Đ`).
+  Không có → trả `null` để nơi vẽ dùng fallback `?`.
+- Nhờ tách lớp, chỉ cần **11 glyph nguyên âm** + dấu rời là vẽ được toàn bộ
+  ~90 ký tự tiếng Việt thường dùng, thay vì vẽ tay từng ký tự dựng sẵn.
+
+### Vẽ & đo
+
+- `drawText(fb, text, x, y, color, opts)` vẽ từng pixel bằng `fb.blendPixel`
+  (tôn trọng alpha), không dùng API Canvas. `x, y` là góc trên-trái ô đầu.
+- `scale` nguyên ≥ 1: mỗi điểm ảnh font phóng thành khối `scale×scale`.
+- `align`: `left | center | right` dịch `startX` theo bề rộng cả chuỗi;
+  `spacing` cộng thêm pixel giữa các ô; `shadow` vẽ một lượt màu bóng lệch
+  `1` pixel font (× scale) xuống phải **trước** lượt chữ chính.
+- `measureText(text, scale)` = `{ width: n·6·scale, height: 11·scale }`.
+
+### Độ phức tạp
+
+Tra glyph và ghép dấu `O(1)` mỗi ký tự (hash map). Vẽ `O(bật · scale²)` trên
+mỗi ký tự, `bật` ≈ số pixel `#` của glyph (khoảng 10–20). Đo `O(n)`.
+
+### Thêm ký tự mới
+
+- Ký tự thường: thêm một entry 7×5 vào `GLYPHS`.
+- Nguyên âm có dấu: thêm vào họ tương ứng trong `VOWEL_GROUPS` (đúng thứ tự
+  không dấu → sắc → huyền → hỏi → ngã → nặng) hoặc vào `GLYPHS` nếu là glyph
+  đặc biệt như `đ`/`Đ`.
+
+### File
+
+`src/core/font.ts`, `src/core/font-data.ts`; test `tests/font.test.ts`.
 
 ## #8 — Camera & vòng lặp engine
 
