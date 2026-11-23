@@ -49,6 +49,8 @@ Ba ảnh có cùng bố cục, chỉ khác ánh sáng và màu. Mỗi ảnh đú
 
 `palette.json` chứa màu đo tự động tại cùng vị trí trên ba ảnh (`day`, `sunset`, `night`). Đây là **gợi ý ban đầu cho #5**; TV3 quyết định giá trị cuối cùng trong `src/core/palette.ts`. Ánh xạ sang key của SPEC:
 
+Swatch 63 key đã chốt cho #5 (ngày/đêm): [palette-day-night.svg](palette-day-night.svg).
+
 | `palette.json` | Key trong SPEC |
 |---|---|
 | `sky_top`, `sky_mid`, `sky_horizon` | `skyTop`, `skyMid`, `skyBottom` |

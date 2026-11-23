@@ -9,6 +9,7 @@ chung. Mỗi issue cập nhật phần tương ứng ngay trong PR của mình.
 - [#6 — Biến đổi 2D](#6--biến-đổi-2d)
 - [#7 — Font bitmap tiếng Việt](#7--font-bitmap-tiếng-việt)
 - [#8 — Camera & vòng lặp engine](#8--camera--vòng-lặp-engine)
+- [#5 — Palette ngày/đêm](#5--palette-ngàyđêm)
 
 ---
 
@@ -279,3 +280,28 @@ tra mọi điểm vẫn thỏa `(x/rx)² + (y/ry)² = 1` khi áp nghịch đảo
 
 > Bảo cập nhật: world → screen, zoom/pan, `requestAnimationFrame`, đo FPS,
 > cache lớp tĩnh.
+
+## #5 — Palette ngày/đêm
+
+`src/core/palette.ts` định nghĩa đúng 63 key của SPEC #1 trong hai bảng `DAY`
+và `NIGHT`. Màu dùng packed `RGBA` (`0xRRGGBBAA`); `mixPalette` nội suy từng
+kênh qua `lerpColor`, với `t` được kẹp vào `[0, 1]`. Palette ngày dùng xanh trời,
+xanh lá và nâu ấm. Palette đêm chuyển nền sang xanh lam/tím trầm, đồng thời giữ
+cửa sổ, trăng, sao và đom đóm sáng để silhouette dễ đọc. Viền dùng `ink` và
+`inkSoft` theo gợi ý SPEC.
+
+`DayNightCycle` giữ progress tuyến tính 1,4 giây và chuyển phase qua smoothstep
+`t²(3−2t)`. Gọi `toggle()` đảo hướng ngay tại phase hiện tại; `palette()` trả về
+object cache do `update(dt)` cập nhật, không cấp phát trong `draw`.
+
+Mọi object chỉ dùng màu từ `env.palette` (có thể biến đổi bằng `withAlpha` hoặc
+`lerpColor`); không hardcode màu cảnh và không tự chọn màu bằng nhánh ngày/đêm.
+
+| Vai trò | Ngày | Đêm |
+|---|---|---|
+| Trời (`skyTop`) | `#86bff8` | `#03245b` |
+| Núi xa (`mountainFar`) | `#77b3db` | `#0d2e69` |
+| Nấm (`mushroomCap`) | `#c3574b` | `#5b2034` |
+| Cửa sổ (`window`) | `#c48f5d` | `#f6be61` |
+| Nước (`waterShallow`) | `#7eb5c2` | `#26426c` |
+| Viền (`ink`) | `#34261f` | `#0a0a16` |
