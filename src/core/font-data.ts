@@ -11,7 +11,7 @@
  * Dấu hỏi, dấu nặng và móc `ơ`/`ư` do nhóm vẽ thêm. Toàn bộ phần ghép dấu
  * (chọn chữ cơ sở + xếp chồng dấu) là của nhóm, không dùng glyph dựng sẵn.
  *
- * Ô ký tự: rộng **8**, cao **22**. Glyph 8×16 đặt tại hàng `BASE_TOP = 4`;
+ * Ô ký tự: rộng **8**, cao **23**. Glyph 8×16 đặt tại hàng `BASE_TOP = 5`;
  * vùng phía trên dành cho dấu (xếp chồng tối đa 2 dấu, cách 1 hàng trống),
  * vùng dưới dành cho đuôi chữ và dấu nặng.
  */
@@ -26,10 +26,10 @@ export const GLYPH_H = 16;
 export const CELL_W = 8;
 
 /** Chiều cao một ô ký tự, đủ chỗ dấu trên/dưới và đuôi chữ. */
-export const CELL_H = 22;
+export const CELL_H = 23;
 
 /** Hàng bắt đầu của glyph gốc trong ô. */
-export const BASE_TOP = 4;
+export const BASE_TOP = 5;
 
 /** Dấu thanh. `dot` (nặng) nằm dưới chân chữ. */
 export type ToneName = 'acute' | 'grave' | 'hook' | 'tilde' | 'dot';
@@ -45,20 +45,20 @@ export interface DecomposedGlyph {
   modifier: ModifierName | null;
 }
 
-/** Bitmap dấu thanh, mỗi dấu 2 hàng × 8 cột. */
+/** Bitmap dấu thanh, rộng 8 cột; dấu hỏi cao 3 hàng cho giống dấu ?, các dấu khác 2 hàng. */
 export const TONE_ROWS: Readonly<Record<ToneName, readonly string[]>> = {
   acute: ['...##...', '..##....'],
   grave: ['..##....', '...##...'],
-  hook: ['..##....', '.#......'],
+  hook: ['..###...', '....##..', '...##...'],
   tilde: ['.###.##.', '##.###..'],
-  dot: ['..##....', '..##....'],
+  dot: ['...##...', '...##...'],
 };
 
-/** Bitmap dấu phụ, mỗi dấu 2 hàng × 8 cột. */
+/** Bitmap dấu phụ, rộng 8 cột. Móc cao 3 hàng, hàng dưới chạm vai phải chữ o/u. */
 export const MODIFIER_ROWS: Readonly<Record<ModifierName, readonly string[]>> = {
   circumflex: ['..###...', '.##.##..'],
   breve: ['.##.##..', '..###...'],
-  horn: ['......#.', '.....##.'],
+  horn: ['......##', '......##', '.....##.'],
 };
 
 /** Ký tự thay thế khi gặp glyph chưa hỗ trợ. */
@@ -167,6 +167,15 @@ const GLYPH_HEX: Readonly<Record<string, string>> = {
   'Đ': '0000786C6666F66666666C7800000000',
   'đ': '0000061F067EC6C6C6C6C67E00000000',
   'ı': '00000000003818181818183C00000000',
+  '—': '00000000000000FF0000000000000000',
+  '–': '00000000000000FE0000000000000000',
+  '·': '00000000000000181800000000000000',
+  '…': '00000000000000000000DBDB00000000',
+  '°': '00386C6C380000000000000000000000',
+  '“': '0066CCCC000000000000000000000000',
+  '”': '00333366000000000000000000000000',
+  '‘': '00183030000000000000000000000000',
+  '’': '00181830000000000000000000000000',
 };
 
 function decode(hex: string): Uint8Array {

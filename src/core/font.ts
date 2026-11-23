@@ -140,16 +140,17 @@ function blitGlyph(
   }
 }
 
-/** Vẽ bitmap dấu; `topRow` là hàng ô (tuyệt đối trong cell) của hàng dấu đầu. */
+/** Vẽ bitmap dấu; `bottomRow` là hàng ô (tuyệt đối trong cell) của hàng dấu dưới cùng. */
 function blitMark(
   fb: Framebuffer,
   rows: readonly string[],
   x0: number,
   textY: number,
-  topRow: number,
+  bottomRow: number,
   color: RGBA,
   scale: number,
 ): void {
+  const topRow = bottomRow - rows.length + 1;
   for (let r = 0; r < rows.length; r++) {
     const row = rows[r];
     for (let c = 0; c < row.length; c++) {
@@ -167,26 +168,33 @@ function drawGlyph(
   color: RGBA,
   scale: number,
 ): void {
-  const key = glyph.base === 'i' && glyph.tone !== null ? DOTLESS_I : glyph.base;
+  // i mất chấm khi có dấu thanh phía trên; dấu nặng nằm dưới nên giữ chấm
+  const toneAbove = glyph.tone !== null && glyph.tone !== 'dot';
+  const key = glyph.base === 'i' && toneAbove ? DOTLESS_I : glyph.base;
   const rows = glyphRows(key);
   const bounds = glyphBounds(key);
   const textY = y + BASE_TOP * scale;
   blitGlyph(fb, rows, x, textY, color, scale);
 
-  let modifierTop: number | null = null;
-  if (glyph.modifier) {
-    const contentTop = BASE_TOP + bounds.top;
-    const bottom = glyph.modifier === 'horn' ? contentTop - 1 : contentTop - 2;
-    modifierTop = bottom - 1;
-    blitMark(fb, MODIFIER_ROWS[glyph.modifier], x, y, modifierTop, color, scale);
+  const contentTop = BASE_TOP + bounds.top;
+  // Hàng dưới cùng mà dấu thanh phía trên được phép chạm tới
+  let toneBottom = contentTop - 2;
+
+  if (glyph.modifier === 'horn') {
+    // Móc gắn vào vai phải chữ, không chiếm chỗ của dấu thanh
+    blitMark(fb, MODIFIER_ROWS.horn, x, y, contentTop, color, scale);
+  } else if (glyph.modifier) {
+    const marks = MODIFIER_ROWS[glyph.modifier];
+    blitMark(fb, marks, x, y, contentTop - 2, color, scale);
+    toneBottom = contentTop - 2 - marks.length - 1;
   }
 
   if (glyph.tone === 'dot') {
-    const topRow = BASE_TOP + bounds.bottom + 1;
-    blitMark(fb, TONE_ROWS.dot, x, y, topRow, color, scale);
+    // Cách chân chữ 1 hàng trống
+    const bottom = BASE_TOP + bounds.bottom + 2 + TONE_ROWS.dot.length - 1;
+    blitMark(fb, TONE_ROWS.dot, x, y, bottom, color, scale);
   } else if (glyph.tone) {
-    const bottom = modifierTop === null ? BASE_TOP + bounds.top - 2 : modifierTop - 2;
-    blitMark(fb, TONE_ROWS[glyph.tone], x, y, bottom - 1, color, scale);
+    blitMark(fb, TONE_ROWS[glyph.tone], x, y, toneBottom, color, scale);
   }
 }
 
