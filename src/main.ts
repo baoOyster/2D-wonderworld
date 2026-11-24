@@ -1,60 +1,58 @@
-import './style.css'
-import heroImg from './assets/hero.png'
-import typescriptLogo from './assets/typescript.svg'
-import viteLogo from './assets/vite.svg'
-import { setupCounter } from './counter.ts'
+import './style.css';
+import { Engine, type Scene } from './core/engine.ts';
+import { Renderer } from './core/renderer.ts';
+import { demoNames, resolveDemo } from './demo/index.ts';
 
-document.querySelector<HTMLDivElement>('#app')!.innerHTML = `
-<section id="center">
-  <div class="hero">
-    <img src="${heroImg}" class="base" width="170" height="179">
-    <img src="${typescriptLogo}" class="framework" alt="TypeScript logo"/>
-    <img src="${viteLogo}" class="vite" alt="Vite logo" />
-  </div>
-  <div>
-    <h1>Get started</h1>
-    <p>Edit <code>src/main.ts</code> and save to test <code>HMR</code></p>
-  </div>
-  <button id="counter" type="button" class="counter"></button>
-</section>
+const canvas = document.querySelector<HTMLCanvasElement>('#stage');
+if (!canvas) throw new Error('Không tìm thấy canvas #stage');
 
-<div class="ticks"></div>
+const params = new URLSearchParams(location.search);
+const demoName = params.get('demo');
+const debug = params.get('debug') === '1';
+const demo = resolveDemo(demoName);
 
-<section id="next-steps">
-  <div id="docs">
-    <svg class="icon" role="presentation" aria-hidden="true"><use href="/icons.svg#documentation-icon"></use></svg>
-    <h2>Documentation</h2>
-    <p>Your questions, answered</p>
-    <ul>
-      <li>
-        <a href="https://vite.dev/" target="_blank">
-          <img class="logo" src="${viteLogo}" alt="" />
-          Explore Vite
-        </a>
-      </li>
-      <li>
-        <a href="https://www.typescriptlang.org" target="_blank">
-          <img class="button-icon" src="${typescriptLogo}" alt="">
-          Learn more
-        </a>
-      </li>
-    </ul>
-  </div>
-  <div id="social">
-    <svg class="icon" role="presentation" aria-hidden="true"><use href="/icons.svg#social-icon"></use></svg>
-    <h2>Connect with us</h2>
-    <p>Join the Vite community</p>
-    <ul>
-      <li><a href="https://github.com/vitejs/vite" target="_blank"><svg class="button-icon" role="presentation" aria-hidden="true"><use href="/icons.svg#github-icon"></use></svg>GitHub</a></li>
-      <li><a href="https://chat.vite.dev/" target="_blank"><svg class="button-icon" role="presentation" aria-hidden="true"><use href="/icons.svg#discord-icon"></use></svg>Discord</a></li>
-      <li><a href="https://x.com/vite_js" target="_blank"><svg class="button-icon" role="presentation" aria-hidden="true"><use href="/icons.svg#x-icon"></use></svg>X.com</a></li>
-      <li><a href="https://bsky.app/profile/vite.dev" target="_blank"><svg class="button-icon" role="presentation" aria-hidden="true"><use href="/icons.svg#bluesky-icon"></use></svg>Bluesky</a></li>
-    </ul>
-  </div>
-</section>
+const engine = new Engine(
+  canvas,
+  (framebuffer, camera) => new Renderer(framebuffer, camera),
+);
 
-<div class="ticks"></div>
-<section id="spacer"></section>
-`
+const scene: Scene = {
+  update(): void {
+    // Demo tự dùng `time` khi vẽ; update dành cho scene chung (#9).
+  },
+  draw(_renderer): void {
+    demo(engine.framebuffer, engine.time);
+  },
+  drawOverlay(renderer): void {
+    if (!debug) return;
 
-setupCounter(document.querySelector<HTMLButtonElement>('#counter')!)
+    const label = demoName && demoNames.includes(demoName)
+      ? `demo=${demoName}`
+      : 'demo=gradient';
+    renderer.text(
+      `FPS ${engine.fps.toFixed(0)}  ·  Zoom ${engine.camera.zoom.toFixed(2)}x`,
+      14,
+      14,
+      0xfff8e7ff,
+      1,
+      'left',
+      0x000000b0,
+    );
+    renderer.text(
+      `${label}  ·  vẽ ${engine.renderTime.toFixed(1)} ms`,
+      14,
+      46,
+      0xfff8e7ff,
+      1,
+      'left',
+      0x000000b0,
+    );
+  },
+};
+
+engine.mount(scene);
+engine.start();
+
+if (import.meta.hot) {
+  import.meta.hot.dispose(() => engine.stop());
+}
