@@ -87,6 +87,30 @@ describe('Renderer', () => {
     expect(colors.has(highlight)).toBe(true);
   });
 
+  it('vật bị khung cắt không có dải tối/sáng dọc mép ảnh', () => {
+    const { fb, renderer } = setup();
+    renderer.begin(BG);
+
+    const shade = 0xaa2222ff;
+    const highlight = 0xffdd88ff;
+    // Hình vuông thò ra ngoài mép trái và mép trên của framebuffer
+    const block = renderer.mask();
+    block.polygon([
+      { x: -50, y: -50 },
+      { x: 100, y: -50 },
+      { x: 100, y: 100 },
+      { x: -50, y: 100 },
+    ]);
+    renderer.shape(block, { fill: FILL, shade, highlight });
+
+    // Mép trái và mép trên của ảnh: vẫn là màu nền khối
+    expect(fb.getPixel(0, 75)).toBe(FILL);
+    expect(fb.getPixel(75, 0)).toBe(FILL);
+    // Mép thật của khối vẫn có 3 tông: dưới có tông tối, phải có tông sáng
+    expect(fb.getPixel(75, 148)).toBe(shade);
+    expect(fb.getPixel(148, 75)).toBe(highlight);
+  });
+
   it('vẽ chữ bằng font bitmap, không dùng API Canvas', () => {
     const { fb, renderer } = setup();
     renderer.begin(BG);

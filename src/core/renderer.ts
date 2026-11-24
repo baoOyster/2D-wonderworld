@@ -393,6 +393,8 @@ export class Renderer implements RendererApi {
    * - ngược lại sáng nếu pixel lệch `(−h, +h)` không thuộc mask;
    * - ngược lại màu nền.
    *
+   * Điểm lệch nằm ngoài framebuffer coi là thuộc mask, giống quy ước của viền.
+   *
    * Viền được vẽ sau nên luôn nằm trên cùng.
    */
   private fillShape(
@@ -427,10 +429,12 @@ export class Renderer implements RendererApi {
         let chosen = baseColor;
         let channels = base;
 
+        // Điểm lệch rơi ra ngoài khung được tính là "trong mask" (giống viền),
+        // nên vật bị khung cắt không có dải tối/sáng chạy dọc mép ảnh.
         if (shade) {
           const sx = x - shadeOffset;
           const sy = y + shadeOffset;
-          if (sx < 0 || sy >= h || data[sy * w + sx] === 0) {
+          if (sx >= 0 && sy < h && data[sy * w + sx] === 0) {
             chosen = shadeColor!;
             channels = shade;
           }
@@ -439,7 +443,7 @@ export class Renderer implements RendererApi {
         if (channels === base && highlight) {
           const sx = x + highlightOffset;
           const sy = y - highlightOffset;
-          if (sx >= w || sy < 0 || data[sy * w + sx] === 0) {
+          if (sx < w && sy >= 0 && data[sy * w + sx] === 0) {
             chosen = highlightColor!;
             channels = highlight;
           }
