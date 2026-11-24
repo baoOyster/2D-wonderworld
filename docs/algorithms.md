@@ -4,11 +4,13 @@ Tài liệu này ghi lại thuật toán thật sự dùng trong code, chi phí 
 chung. Mỗi issue cập nhật phần tương ứng ngay trong PR của mình.
 
 - [#2 — Framebuffer, màu, RNG](#2--framebuffer-màu-rng)
+- [#32 — Presenter & trang demo](#32--presenter--trang-demo)
 - [#3 — Raster đường, tròn, ellipse](#3--raster-đường-tròn-ellipse)
 - [#4 — Tô vùng & mask](#4--tô-vùng--mask)
 - [#6 — Biến đổi 2D](#6--biến-đổi-2d)
 - [#7 — Font bitmap tiếng Việt](#7--font-bitmap-tiếng-việt)
 - [#8 — Camera & vòng lặp engine](#8--camera--vòng-lặp-engine)
+- [#34 — Renderer hoàn chỉnh](#34--renderer-hoàn-chỉnh)
 - [#5 — Palette ngày/đêm](#5--palette-ngàyđêm)
 
 ---
@@ -126,6 +128,52 @@ Các test hiện có:
 - `tests/framebuffer.test.ts` — clear, set/get, clip biên, source-over.
 - `tests/rng.test.ts` — cùng seed, khác seed, khoảng giá trị, snapshot.
 - `tests/vec2.test.ts` — `vec2`, `clamp`, `lerp`.
+
+---
+
+## #32 — Presenter & trang demo
+
+Mã nguồn: `src/core/presenter.ts`, `src/demo/index.ts`, `src/demo/gradient.ts`
+Trang chạy: `?demo=<tên>`, `?debug=1`
+
+### Presenter
+
+`Presenter` gắn với một canvas, đặt backing store đúng `FB_W × FB_H` (1920×1080
+ở `RENDER_SCALE = 1.5`) và chỉ dùng **một** lệnh:
+
+```ts
+ctx.putImageData(fb.image, 0, 0);
+```
+
+`ImageData` do `Framebuffer` tạo một lần, dùng chung vùng nhớ với `fb.data`, nên
+mỗi frame không cấp phát thêm. Không dùng `ctx.drawImage`, `fillRect`, `arc`…
+
+CSS trong `style.css` giữ tỉ lệ 16:9:
+
+```css
+width: min(100vw, calc(100vh * 16 / 9));
+height: min(100vh, calc(100vw * 9 / 16));
+aspect-ratio: 16 / 9;
+object-fit: contain;
+```
+
+Phần dư hai bên/dưới là letterbox. Không bật `image-rendering: pixelated`.
+
+### Trang demo
+
+`src/demo/index.ts` dùng `import.meta.glob(['./*.ts', '!./index.ts'])` để tự nạp
+mọi file demo. Mỗi file export default:
+
+```ts
+(fb: Framebuffer, t: number) => void
+```
+
+`t` là thời gian mô phỏng (giây) do engine truyền. Thêm demo mới chỉ cần tạo
+`src/demo/<tên>.ts`; không sửa `index.ts`. Tên file chính là `?demo=<tên>`.
+Tên không tồn tại rơi về demo `gradient`.
+
+`gradient.ts` vẽ nền bằng `fb.setPixel` theo từng dòng (mỗi dòng một màu, không
+gọi `lerpColor` 2 triệu lần mỗi frame) và một ô vuông nhấp nháy theo `t`.
 
 ---
 
@@ -358,8 +406,7 @@ Lệnh kiểm tra:
 - So sánh viền riêng từng elip với
   viền chung của Mask hợp.
 
-Demo được tích hợp vào ?demo=fill
-khi Presenter của Issue #32 sẵn sàng.
+Demo được tích hợp vào `?demo=fill` qua trang demo của #32.
 
 
 ## #6 — Biến đổi 2D
@@ -485,8 +532,164 @@ mỗi ký tự, `bật` ≈ số pixel bật của glyph (khoảng 20–45 với
 
 ## #8 — Camera & vòng lặp engine
 
-> Bảo cập nhật: world → screen, zoom/pan, `requestAnimationFrame`, đo FPS,
-> cache lớp tĩnh.
+Mã nguồn: `src/core/camera.ts`, `src/core/engine.ts`, `src/core/presenter.ts`
+Test: `tests/camera.test.ts`, `tests/engine.test.ts` (renderer giả vẽ bằng
+`setPixel`, đồng hồ giả điều khiển rAF + `performance.now` nên tất định)
+
+### Ma trận camera
+
+Camera chỉ tịnh tiến + phóng đều, **không xoay**:
+
+```
+screen = scale(RENDER_SCALE) · translate(panX, panY) · scale(zoom) · world
+```
+
+Với `RENDER_SCALE = 1.5`, một điểm world `(x, y)` thành:
+
+```
+screenX = 1.5 · (zoom · x + panX)
+screenY = 1.5 · (zoom · y + panY)
+```
+
+Vì không có thành phần xoay, đường thẳng vẫn là đường thẳng và hình tròn/elip
+chỉ cần nhân bán kính với `RENDER_SCALE · zoom`; không phải viết lại thuật toán
+raster cho hệ toạ độ màn hình.
+
+Ma trận được cache và chỉ tính lại khi `zoom`, `panX` hoặc `panY` đổi. Các
+setter đều kẹp giá trị:
+
+- `zoom ∈ [1, 3]`.
+- `panX ∈ [WORLD_W · (1 − zoom), 0]`, `panY ∈ [WORLD_H · (1 − zoom), 0]`.
+
+Suy từ điều kiện khung nhìn không lộ ngoài world: mép trái màn hình ứng với
+world `−panX / zoom ≥ 0`, mép phải `(WORLD_W − panX) / zoom ≤ WORLD_W`.
+
+### `zoomAt(screenPoint, factor)`
+
+1. Lưu điểm world dưới con trỏ: `p = screenToWorld(screenPoint)`.
+2. Tính `zoom' = clamp(zoom · factor, 1, 3)`.
+3. Giải pan để `p` vẫn nằm dưới con trỏ:
+
+```
+pan' = screenPoint / RENDER_SCALE − zoom' · p
+```
+
+4. Kẹp pan. Nhờ bước 1–3, zoom quanh con trỏ không bị trượt; ở sát biên pan bị
+   kẹp nên điểm có thể xê dịch một chút, đúng quy ước không lộ ngoài world.
+
+`screenToWorld` tính trực tiếp `(screen / RENDER_SCALE − pan) / zoom`;
+test kiểm tra nó trùng với nghịch đảo ma trận và round-trip qua `worldToScreen`.
+
+### Vòng lặp engine
+
+- `requestAnimationFrame`, bước cập nhật cố định `1/60` giây.
+- Accumulator nhận `min(frameDt, 250ms)`; tối đa **5 update/frame**. Nếu chạm
+  giới hạn (tab vừa quay lại) thì bỏ phần dư để không dồn vô hạn.
+- FPS đo bằng EMA hệ số 0.1; `renderTime` (ms) cũng làm mượt tương tự.
+- Mỗi frame: `world.begin(clearColor)` → `scene.draw(world)` →
+  `scene.drawOverlay?.(overlay)` → `Presenter.present(fb)`.
+- `overlay` là renderer thứ hai dùng camera `scale(RENDER_SCALE)` (zoom 1, pan
+  0), nên chữ/viền UI không bị phóng theo camera thế giới.
+- Engine không import bản cài đặt `renderer.ts`; nhận `makeRenderer(fb, camera,
+  overlay)` từ ngoài, nhờ vậy test có thể dùng renderer giả.
+
+Chi phí mỗi frame chủ yếu là `putImageData` (1920×1080) và các lượt tô toàn
+màn hình; clear + vẽ cảnh trùng nhau sẽ được tối ưu bằng cache lớp tĩnh ở #26.
+
+---
+
+## #34 — Renderer hoàn chỉnh
+
+Mã nguồn: `src/core/renderer.ts`, `src/core/renderer-types.ts`
+Demo: `?demo=primitives`
+
+`Renderer` cài đặt `interface Renderer` của SPEC #1 mục 3.6. Mọi tham số là toạ
+độ/bán kính/độ dày **world**; renderer biến đổi qua `camera` rồi gọi:
+
+| Phương thức | Cài đặt bên dưới |
+|---|---|
+| `line` / `polyline` | Bresenham hoặc DDA; nét dày dùng `thickLine` |
+| `circle` | Midpoint circle, bán kính `r · RENDER_SCALE · zoom` |
+| `ellipse` | Midpoint ellipse |
+| `polygon` | Scanline fill, hoặc `strokePolygon` khi `filled = false` |
+| `floodFill` | Flood fill 4 hướng, toạ độ điểm gieo đổi qua camera |
+| `text` | Font bitmap; scale pixel = `max(2, round(scale · RENDER_SCALE · zoom))` |
+| `mask` | Cấp `WorldMask` từ pool, xoá sạch |
+| `shape` | Tô 3 tông + viền + clip trên một mask |
+
+### Mask theo toạ độ world
+
+`WorldMask` bọc một `Mask` kích thước framebuffer và giữ camera:
+
+- `polygon(pts)`: biến đổi đỉnh rồi `maskPolygon`.
+- `ellipse(cx, cy, rx, ry)` / `circle`: đổi tâm và nhân bán kính với
+  `RENDER_SCALE · zoom` rồi `maskEllipse`.
+- `union` / `intersect` / `subtract`: OR / AND / AND-NOT trực tiếp trên
+  `Uint8Array`.
+- `clear`, `isEmpty`.
+
+`Renderer.mask()` lấy mask từ pool theo thứ tự, `begin()` đặt lại con trỏ pool.
+Mỗi mask chỉ dùng trong khung hiện tại; khung sau bộ đệm được xoá và tái sử
+dụng nên không cấp phát `Uint8Array` mới mỗi frame.
+
+### `shape()` — 3 tông, viền, clipping
+
+Giả sử mask `m`:
+
+- **Nền + tối + sáng**: một lượt quét hộp bao, mỗi pixel thuộc `m` chọn đúng
+  một màu. Tối nếu pixel lệch `(+s, −s)` không thuộc `m`, tức
+  `m − shift(m, +s, −s)`; ngược lại sáng nếu pixel lệch `(−h, +h)` không thuộc
+  `m`; ngược lại màu nền. Renderer kiểm tra trực tiếp `m.data`, không tạo mask
+  phụ và không quét ba lần.
+- **Viền**: BFS từ biên vào trong. Pixel thuộc `m` có hàng xóm 4 hướng nằm ngoài
+  `m` là lớp 1; hàng xóm kề nó là lớp 2… Dừng ở
+  `outlineWidth · RENDER_SCALE · zoom` lớp (tối thiểu 1px, tối đa 255). Hai mảng
+  đệm `Uint8Array` (độ sâu) và `Int32Array` (hàng đợi) được dùng lại, không cấp
+  phát mask và không phụ thuộc diện tích hộp bao. Mép framebuffer được coi là
+  "trong mask" nên vật bị khung cắt không có viền giả dọc mép ảnh. Cả lượt tìm
+  lớp biên lẫn lượt mở rộng BFS đều **viết thẳng 4 hàng xóm** (không duyệt mảng
+  cặp `[dx, dy]`), nhờ vậy mỗi pixel không cấp phát iterator — đo trên cảnh demo
+  `?demo=primitives` (tán cây 5 elip, 1920×1080) lượt `shape()` có viền nhanh
+  khoảng 3,7 lần so với bản duyệt mảng (13,1 ms → 3,5 ms).
+- **Clip**: mọi lượt tô kiểm tra trực tiếp `clip.data` tại cùng chỉ số pixel.
+
+Viền được vẽ **sau** tông tối/sáng nên đường bao luôn sạch. Vì viền tính trên
+mask đã hợp, tán cây ghép nhiều elip chỉ có một viền ngoài, không lộ viền ở mối
+nối (test `tests/renderer.test.ts`).
+
+### Demo `?demo=primitives`
+
+Vẽ cùng một cảnh hai lần: toàn cảnh camera 1× và khung 960×540 pixel (vùng
+320×180 world) qua camera 2×, đặt cạnh nhau. Demo dùng lưới toạ độ, line
+DDA/Bresenham, nét dày, tròn, elip, đa giác, chữ tiếng Việt, và `mask()` +
+`shape()` cho tán cây, mũ nấm có đốm bị clip. Khung 2× chứng minh camera/renderer
+biến đổi đúng mà không cần API Canvas.
+
+Phần cảnh tĩnh (lưới, núi, đất, lối đi, mây, cây, nhà nấm, hoa, nhãn) vẽ **một
+lần** vào một framebuffer riêng rồi mỗi frame chép sang; chỉ tia nắng quay theo
+`t` được vẽ lại — đúng cách #26 sẽ cache lớp nền. Nhờ vậy frame ổn định ở
+1920×1080 (đo trên Chrome headless / Apple M4: 0,65 ms cho phần vẽ lại, 79–90
+FPS; chép lớp tĩnh 8 MB chỉ tốn ~0,6 ms vì là một lệnh `data.set`). Vẽ lại toàn
+bộ cảnh mỗi frame tốn ~21 ms nên không đạt 60 FPS — con số này là lý do #26 bắt
+buộc cache lớp tĩnh.
+
+### Chi phí
+
+- Line/circle/ellipse/polygon: như thuật toán gốc (#3, #4), chỉ thêm phép biến
+  đổi toạ độ O(1) mỗi đỉnh/điểm.
+- Mask: O(số pixel của hộp bao) cho mỗi hình; pool giữ bộ nhớ ổn định.
+- Viền: quét hộp bao một lượt để tìm lớp biên + BFS tối đa `width` lớp, chi phí
+  O(area + số pixel viền); hai mảng tạm tái sử dụng.
+- 3 tông: chung lượt quét với nền, không cấp phát.
+
+Số đo `?demo=primitives` (1920×1080, Chrome headless, Apple M4): `clear` 2,7 ms;
+sàn + núi + lối đi ~5 ms; tán cây 5 elip `mask()`+`shape()` 3,5 ms; mũ nấm
+`shape()` 1,5 ms; `present` (`putImageData`) 0,7 ms.
+
+Kiểm thử: `tests/renderer.test.ts` (biến đổi toạ độ, bán kính, một viền ngoài,
+clip, 3 tông, chữ) và `tests/camera.test.ts`.
+
+---
 
 ## #5 — Palette ngày/đêm
 
