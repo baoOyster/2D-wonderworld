@@ -306,6 +306,14 @@ describe('floodFill', () => {
     expect(count).toBe(0);
   });
 
+  it('rounds a fractional seed to the nearest pixel', () => {
+    const { fb } = makeFloodTarget(10, 10);
+    const painted = floodFill(fb, 4.6, 5.2, blue);
+    expect(painted).toBe(100);
+    expect(fb.getPixel(5, 5)).toBe(blue);
+    expect(floodFill(fb, Number.NaN, 2, white)).toBe(0);
+  });
+
   it('does nothing if the color is unchanged', () => {
     const { fb } = makeFloodTarget(10, 10);
 

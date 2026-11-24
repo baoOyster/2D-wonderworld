@@ -197,9 +197,15 @@ export function floodFill(
   const w = fb.width;
   const h = fb.height;
 
-  if (!Number.isInteger(startX) ||
-      !Number.isInteger(startY) ||
-      startX < 0 || startY < 0 ||
+  if (!Number.isFinite(startX) || !Number.isFinite(startY)) {
+    return 0;
+  }
+
+  // Toạ độ world nhân với RENDER_SCALE có thể ra số lẻ: làm tròn về pixel gần nhất
+  startX = Math.round(startX);
+  startY = Math.round(startY);
+
+  if (startX < 0 || startY < 0 ||
       startX >= w || startY >= h) {
     return 0;
   }

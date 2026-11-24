@@ -22,7 +22,6 @@ export default function demoFill(
   const green = rgb('#45b879');
   const blue = rgb('#38bdf8');
   const yellow = rgb('#ffd166');
-  const dark = rgb('#15202b');
   const white = rgb('#ffffff');
 
   fb.clear(bg);
@@ -80,10 +79,10 @@ export default function demoFill(
   maskEllipse(leftB, 560, 840, 170, 90);
 
   fillMask(fb, leftA, green);
-  outlineMask(fb, leftA, dark, 4);
+  outlineMask(fb, leftA, white, 4);
 
   fillMask(fb, leftB, green);
-  outlineMask(fb, leftB, dark, 4);
+  outlineMask(fb, leftB, white, 4);
 
   // 5. Hợp Mask rồi tạo một viền chung
   const rightA = new Mask(fb.width, fb.height);
@@ -95,5 +94,5 @@ export default function demoFill(
   const merged = maskUnion(rightA, rightB);
 
   fillMask(fb, merged, green);
-  outlineMask(fb, merged, dark, 4);
+  outlineMask(fb, merged, white, 4);
 }
