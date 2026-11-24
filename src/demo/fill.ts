@@ -1,6 +1,7 @@
 
 import type { Framebuffer } from '../core/framebuffer.ts';
-import { rgb } from '../core/color.ts';
+import { lerpColor } from '../core/color.ts';
+import { DAY } from '../core/palette.ts';
 import {
   polygonFill,
   strokePolygon,
@@ -18,26 +19,33 @@ export default function demoFill(
   fb: Framebuffer,
   _t: number
 ): void {
-  const bg = rgb('#14243b');
-  const green = rgb('#45b879');
-  const blue = rgb('#38bdf8');
-  const yellow = rgb('#ffd166');
-  const white = rgb('#ffffff');
+  // Màu lấy từ palette chung (style guide): nền trời + đất, viền ink
+  const p = DAY;
+  const leafColor = p.canopy;
+  const water = p.waterShallow;
+  const starColor = p.flowerYellow;
+  const ink = p.ink;
 
-  fb.clear(bg);
+  const horizon = Math.round(fb.height * 0.62);
+  for (let y = 0; y < fb.height; y++) {
+    const c = y < horizon
+      ? lerpColor(p.skyTop, p.skyBottom, y / horizon)
+      : lerpColor(p.ground, p.groundDark, (y - horizon) / (fb.height - horizon));
+    for (let x = 0; x < fb.width; x++) fb.setPixel(x, y, c);
+  }
 
   // 1. Núi - Scanline Polygon Fill
   polygonFill(fb, [
     { x: 50, y: 650 },
     { x: 350, y: 180 },
     { x: 650, y: 650 }
-  ], green);
+  ], p.mountainNear);
 
   strokePolygon(fb, [
     { x: 50, y: 650 },
     { x: 350, y: 180 },
     { x: 650, y: 650 }
-  ], white, 3);
+  ], ink, 3);
 
   // 2. Ngôi sao tự cắt - Even-Odd
   const vertices = Array.from(
@@ -56,18 +64,18 @@ export default function demoFill(
   const star = [0, 2, 4, 1, 3]
     .map(i => vertices[i]);
 
-  polygonFill(fb, star, yellow);
-  strokePolygon(fb, star, white, 3);
+  polygonFill(fb, star, starColor);
+  strokePolygon(fb, star, ink, 3);
 
   // 3. Flood Fill bên trong một vùng tròn
   const circle = new Mask(fb.width, fb.height);
   maskEllipse(circle, 1500, 390, 165, 165);
 
-  outlineMask(fb, circle, white, 3);
+  outlineMask(fb, circle, ink, 3);
 
-  floodFill(fb, 1500, 390, blue, {
+  floodFill(fb, 1500, 390, water, {
     mode: 'boundary',
-    boundary: white,
+    boundary: ink,
     maxPixels: 120000
   });
 
@@ -78,11 +86,11 @@ export default function demoFill(
   maskEllipse(leftA, 430, 840, 170, 90);
   maskEllipse(leftB, 560, 840, 170, 90);
 
-  fillMask(fb, leftA, green);
-  outlineMask(fb, leftA, white, 4);
+  fillMask(fb, leftA, leafColor);
+  outlineMask(fb, leftA, ink, 4);
 
-  fillMask(fb, leftB, green);
-  outlineMask(fb, leftB, white, 4);
+  fillMask(fb, leftB, leafColor);
+  outlineMask(fb, leftB, ink, 4);
 
   // 5. Hợp Mask rồi tạo một viền chung
   const rightA = new Mask(fb.width, fb.height);
@@ -93,6 +101,6 @@ export default function demoFill(
 
   const merged = maskUnion(rightA, rightB);
 
-  fillMask(fb, merged, green);
-  outlineMask(fb, merged, white, 4);
+  fillMask(fb, merged, leafColor);
+  outlineMask(fb, merged, ink, 4);
 }
