@@ -9,6 +9,7 @@ chung. Mỗi issue cập nhật phần tương ứng ngay trong PR của mình.
 - [#4 — Tô vùng & mask](#4--tô-vùng--mask)
 - [#6 — Biến đổi 2D](#6--biến-đổi-2d)
 - [#7 — Font bitmap tiếng Việt](#7--font-bitmap-tiếng-việt)
+- [#33 — Scene types & layers](#33--scene-types--layers)
 - [#8 — Camera & vòng lặp engine](#8--camera--vòng-lặp-engine)
 - [#34 — Renderer hoàn chỉnh](#34--renderer-hoàn-chỉnh)
 - [#5 — Palette ngày/đêm](#5--palette-ngàyđêm)
@@ -529,6 +530,42 @@ mỗi ký tự, `bật` ≈ số pixel bật của glyph (khoảng 20–45 với
 ### File
 
 `src/core/font.ts`, `src/core/font-data.ts`; test `tests/font.test.ts`.
+
+## #33 — Scene types & layers
+
+Mã nguồn: `src/scene/types.ts`, `src/scene/layers.ts`.
+Test: `tests/scene-types.test.ts`.
+
+### Hợp đồng dùng chung
+
+- `Env` là ảnh chụp trạng thái một khung (`time`, `dt`, `dayPhase`, `palette`,
+  `camera`); `World` tạo lại mỗi khung và không cho vật thể giữ tham chiếu.
+- `UiActions` (`toggleDayNight`, `select`, `getSelected`) tách vật thể khỏi DOM;
+  `ClickContext = { env, ui }` là tham số của `SceneObject.onClick`.
+- `SceneObject` gồm metadata để hiện panel (`id`, `name`, `description`,
+  `algorithms`), `layer`, cờ `interactive`, cùng `update?`/`draw`/
+  `hitPolygons?`/`onClick?`. `hitPolygons` trả polygon **world-space** và bắt
+  buộc khi `interactive: true`.
+- `WorldCallbacks` cho UI nhận sự kiện `onSelectionChange` / `onHoverChange`.
+- Mọi phụ thuộc đều là **type-only** (`Palette`, `Camera`, `Renderer`, `Vec2`),
+  nên chỉ cần `core/renderer-types.ts` (#8) mà không kéo class renderer thật,
+  và không tạo vòng import với `scene/*`.
+
+### Layer (z-order)
+
+- `Layer` là object `as const` đúng SPEC #1; `World` sort tăng dần theo giá trị,
+  cùng layer giữ thứ tự đăng ký.
+- Thứ tự chính: nền trời (0–7) → đất/hồ/cá/đá/cầu (8–13) → cây/nhà/rào/lối
+  (20–23) → hoa/cỏ/trang trí/thỏ/lá tiền cảnh (30–34) → bướm/đom đóm/chim
+  (40–42) → overlay UI (100). Cá (10) nằm trên mặt hồ (9) nhưng dưới cầu (13).
+- `LayerName` / `LayerValue` suy ra từ chính hằng, tránh gõ lại số.
+
+### Kiểm chứng
+
+- Test so khớp toàn bộ giá trị với SPEC, kiểm tra dãy tăng dần, không trùng và
+  quan hệ z-order giữa các nhóm.
+- Test dựng một `SceneObject` mẫu (kèm `UiActions`, `Renderer` giả) để chắc
+  hợp đồng dùng được: `update`, `draw`, `hitPolygons`, `onClick`, callbacks.
 
 ## #8 — Camera & vòng lặp engine
 
