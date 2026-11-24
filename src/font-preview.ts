@@ -2,9 +2,9 @@
  * Trang preview font (#7): render các câu tiếng Việt bằng `drawText` lên
  * framebuffer rồi `putImageData` lên canvas. Không dùng API Canvas để vẽ chữ.
  */
-import { Framebuffer } from '../core/framebuffer.ts';
-import { drawText } from '../core/font.ts';
-import { CELL_H } from '../core/font-data.ts';
+import { Framebuffer } from './core/framebuffer.ts';
+import { drawText } from './core/font.ts';
+import { CELL_H } from './core/font-data.ts';
 
 const W = 1280;
 const H = 940;

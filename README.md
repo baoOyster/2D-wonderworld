@@ -32,6 +32,23 @@ npm run preview   # chạy bản build
 npm test          # Vitest (bổ sung ở #2)
 ```
 
+### Trang demo
+
+`npm run dev` rồi mở `http://localhost:5173/`:
+
+| URL | Nội dung |
+|---|---|
+| `/` | demo mặc định `gradient`: nền gradient vẽ từng pixel + ô vuông nhấp nháy |
+| `/?demo=primitives` | lưới toạ độ, đường/tròn/elip/đa giác, chữ, tán cây `mask()` + `shape()`, camera 1× và 2× cạnh nhau (#34) |
+| `/?demo=raster` | DDA so với Bresenham, nét dày, Midpoint tròn/elip (#3) |
+| `/?demo=fill` | tô scanline, đa giác tự cắt, flood fill, viền mask (#4) |
+| `/?debug=1` | chồng thêm FPS, mức zoom và thời gian vẽ mỗi khung |
+
+Canvas giữ backing store `FB_W × FB_H` (1920×1080) và CSS letterbox đúng 16:9.
+Muốn thêm demo: tạo `src/demo/<tên>.ts` export default
+`(fb: Framebuffer, t: number) => void`; `src/demo/index.ts` tự nạp mọi file
+trong `src/demo/`, không cần sửa `index.ts`.
+
 ## Điều khiển
 
 | Thao tác | Chức năng |

@@ -1,23 +1,32 @@
 /**
  * Demo `?demo=raster` (Nguyệt, #3): so sánh DDA với Bresenham, nét dày, Midpoint tròn và elip.
  * Trang demo (#32) gọi hàm mặc định mỗi khung hình với framebuffer và thời gian t (giây).
- * Màu ở đây chỉ dùng cho demo, cảnh thật lấy màu từ palette.
+ * Màu lấy từ palette DAY; demo tự vẽ nền trời nên không phụ thuộc màu xoá của engine.
  */
+import { lerpColor, withAlpha } from '../core/color.ts';
+import type { Framebuffer } from '../core/framebuffer.ts';
+import { DAY } from '../core/palette.ts';
 import {
-  circleMidpoint, ellipseMidpoint, lineBresenham, lineDDA, thickLine, type RasterTarget,
+  circleMidpoint, ellipseMidpoint, lineBresenham, lineDDA, thickLine,
 } from '../core/raster.ts';
 
-const INK = 0x34261fff;
-const DDA = 0x2f6fd0ff;
-const BRES = 0xd0402fff;
-const SUN = 0xffd060ff;
-const GLOW = 0xffd06040;
-const CLOUD = 0xffffffff;
-const SHADE = 0xcfe0f0ff;
+const INK = DAY.ink;
+const DDA = DAY.waterDeep;
+const BRES = DAY.mushroomCapDark;
+const SUN = DAY.flowerYellow;
+const GLOW = withAlpha(DAY.sunGlow, 0.25);
+const CLOUD = DAY.cloud;
+const SHADE = DAY.cloudShade;
 
-export default function rasterDemo(fb: RasterTarget, t: number): void {
+export default function rasterDemo(fb: Framebuffer, t: number): void {
   const s = fb.width / 1280; // vẽ theo khung 1280×720 rồi co giãn theo framebuffer
   const S = (v: number): number => v * s;
+
+  // 0) nền trời gradient theo dòng
+  for (let y = 0; y < fb.height; y++) {
+    const c = lerpColor(DAY.skyTop, DAY.skyBottom, y / (fb.height - 1));
+    for (let x = 0; x < fb.width; x++) fb.setPixel(x, y, c);
+  }
 
   // 1) cùng một bộ đoạn thẳng: bên trái DDA (xanh), bên phải Bresenham (đỏ)
   for (let i = 0; i < 6; i++) {
