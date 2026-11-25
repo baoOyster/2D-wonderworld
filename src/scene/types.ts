@@ -21,6 +21,14 @@ export interface Env {
   palette: Palette;
   /** Camera world → screen dùng chung của cảnh. */
   camera: Camera;
+  /**
+   * Vị trí con trỏ trong toạ độ world (SPEC #1, cập nhật 25/11), `null` khi
+   * chuột ra ngoài khung; `undefined` khi chưa có lớp input (#9).
+   *
+   * Vật **không** `interactive` (lau sậy, cỏ, cá…) chỉ phản ứng theo trường này:
+   * phản ứng phải tắt dần và trở về trạng thái cũ, không hiện nhãn hay panel.
+   */
+  pointer?: Vec2 | null;
 }
 
 /**
