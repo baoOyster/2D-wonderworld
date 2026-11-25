@@ -34,20 +34,29 @@ npm test          # Vitest (bổ sung ở #2)
 
 ### Trang demo
 
-`npm run dev` rồi mở `http://localhost:5173/`:
+`npm run dev` rồi mở `http://localhost:5173/?demo=<tên>`. Không cần file hay trang nào khác: mọi demo chạy qua `index.html` mặc định.
 
 | URL | Nội dung |
 |---|---|
+| `/?demo=scene` | **toàn cảnh**: mọi vật thể đã merge, ngày ↔ đêm tự đổi mỗi 8 giây; phím `N` đổi tay; bấm vào vật để thử tương tác (ví dụ nhà nấm mở cửa) |
+| `/?demo=scene&phase=day` · `&phase=night` | toàn cảnh, đứng yên ban ngày hoặc ban đêm (tiện chụp ảnh) |
+| `/?demo=midground` | cây cổ thụ, nhà nấm, hàng rào, lối đi, hoa cỏ (#14–#17) |
 | `/` | demo mặc định `gradient`: nền gradient vẽ từng pixel + ô vuông nhấp nháy |
 | `/?demo=primitives` | lưới toạ độ, đường/tròn/elip/đa giác, chữ, tán cây `mask()` + `shape()`, camera 1× và 2× cạnh nhau (#34) |
 | `/?demo=raster` | DDA so với Bresenham, nét dày, Midpoint tròn/elip (#3) |
 | `/?demo=fill` | tô scanline, đa giác tự cắt, flood fill, viền mask (#4) |
-| `/?debug=1` | chồng thêm FPS, mức zoom và thời gian vẽ mỗi khung |
+| thêm `&debug=1` | chồng thêm FPS, mức zoom và thời gian vẽ mỗi khung |
 
 Canvas giữ backing store `FB_W × FB_H` (1920×1080) và CSS letterbox đúng 16:9.
-Muốn thêm demo: tạo `src/demo/<tên>.ts` export default
+
+**Thêm demo cho vật thể của mình:** tạo `src/demo/<tên>.ts` export default
 `(fb: Framebuffer, t: number) => void`; `src/demo/index.ts` tự nạp mọi file
-trong `src/demo/`, không cần sửa `index.ts`.
+trong `src/demo/`, không cần sửa `index.ts`. Mọi file demo được nạp ngay khi trang
+mở, nên một file demo lỗi lúc nạp sẽ làm hỏng mọi trang demo: mở thử vài trang khác trước khi push.
+
+**Đưa vật thể vào toàn cảnh:** `?demo=scene` tự gọi mọi hàm `create…()` trong
+`src/scene/<vùng>/index.ts` (`createMidground`, `createRocks`…). Vật thể chỉ cần
+có mặt trong hàm `create…()` của vùng mình là tự hiện trong toàn cảnh.
 
 ## Điều khiển
 
