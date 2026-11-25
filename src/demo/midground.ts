@@ -1,5 +1,5 @@
 /**
- * Demo `?demo=midground` (#14–#16): cây cổ thụ, nhà nấm, hàng rào, lối đi vẽ bằng
+ * Demo `?demo=midground` (#14–#17): cây cổ thụ, nhà nấm, hàng rào, lối đi, hoa, cỏ vẽ bằng
  * Renderer thật (#34), trên nền trời và đất tạm. Ngày ↔ đêm tự đổi mỗi 8 giây.
  */
 import { Camera } from '../core/camera.ts';
@@ -7,6 +7,7 @@ import { lerpColor } from '../core/color.ts';
 import type { Framebuffer } from '../core/framebuffer.ts';
 import { DAY, NIGHT, mixPalette } from '../core/palette.ts';
 import { Renderer } from '../core/renderer.ts';
+import { Meadow } from '../scene/foreground/meadow.ts';
 import { Fence } from '../scene/midground/fence.ts';
 import { MushroomHouse } from '../scene/midground/mushroom-house.ts';
 import { GardenPath } from '../scene/midground/path.ts';
@@ -16,6 +17,7 @@ const tree = new AncientTree();
 const house = new MushroomHouse();
 const fence = new Fence();
 const path = new GardenPath();
+const meadow = new Meadow();
 let renderer: Renderer | null = null;
 let camera: Camera | null = null;
 let target: Framebuffer | null = null;
@@ -59,4 +61,5 @@ export default function midgroundDemo(fb: Framebuffer, t: number): void {
   house.draw(renderer, env);
   fence.draw(renderer, env);
   path.draw(renderer, env);
+  meadow.draw(renderer, env);
 }

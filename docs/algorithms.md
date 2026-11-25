@@ -891,3 +891,35 @@ File: `src/scene/midground/fence.ts`, `src/scene/midground/path.ts`, test `tests
 - **Chỗ nối** tính từ hằng số của nhà và rào, không gõ tay: mép trái ở giữa đầu rào trái và bậc thềm cuối, mép phải ở giữa bậc thềm cuối và đầu rào phải. Lối đi rộng hơn bậc thềm nhưng không lấn qua rào; dời nhà hay rào thì lối đi tự canh lại.
 - **Đa giác:** 28 mẫu dọc đường giữa, mỗi mẫu dịch theo pháp tuyến `±w(t)/2`, `w(t)` tăng tuyến tính 107 → 290. Mẫu đầu dùng pháp tuyến nằm ngang nên mép trên nằm đúng trên chân gò. Mép trái gợn nhẹ `±7%` theo sin. Mép phải là một đoạn thẳng từ đầu rào phải tới điểm mép cuối, để không cong gắt ở cuối.
 - Tô một mask 3 tông `pathStone`/`pathStoneDark` + viền; 6 phiến đá elip đặt dọc đường giữa theo RNG seed cố định, gộp một mask.
+
+## #17 — Hoa và cỏ
+
+File: `src/scene/foreground/flowers.ts`, `grass.ts`, `ground.ts`, `meadow.ts`, test `tests/foreground.test.ts`.
+
+### Hoa (29 bông)
+
+- Cụm trái 9 bông trong vùng `x = 165…275, y = 570…605` của layout (chia ô theo x rồi lệch ngẫu nhiên trong ô), 4 bông ven mép trái lối đi, 16 bông rải trên cỏ trống (cách nhau ≥ 34 px).
+- Mỗi bông: thân là Bézier bậc 2 lấy mẫu thành polyline (viền `ink` 4, lõi `stem` 2); 1–2 lá là elip xoay (polygon fill); 5–6 cánh là **midpoint circle** xếp đều quanh nhụy, mép cánh chạm bán kính bông (8–18 px); nhụy tròn.
+- **8 màu cánh**, đều suy ra từ palette: 4 màu hoa, cam (đỏ + vàng), hồng (đỏ + `mushroomSpot`), hồng tím (đỏ + tím), trắng kem (`mushroomSpot`). Màu (trừ trắng) được tăng bão hoà: mỗi kênh `l + (c − l)·k`, `l` là trung bình 3 kênh, `k = 1,45` ban ngày, giảm còn 1,15 ban đêm.
+- **Lay:** mỗi bông là một Node đặt tại gốc, `R(aᵢ·sin(1,2t + φᵢ))` với `aᵢ ∈ [0,02; 0,04]` và pha riêng, nên không có cảnh "cả vườn gật đầu".
+
+### Cỏ (340 lá)
+
+- Lưới 10 × 14 ô trên phần đất trái (`x = 0…700, y = 480…715`), thử ô theo thứ tự ngẫu nhiên, mỗi ô một khóm lệch ngẫu nhiên trong ô (jittered grid): cỏ rải khắp mà không thẳng hàng. Bỏ ô rơi vào lối đi, gò đất, vùng rễ, phần đất chừa, và ô ngay trước một bông mà cao tới đầu hoa. Thêm 4 bụi ở chân rễ cây.
+- Mỗi khóm 6 lá xoè hình quạt. Lá là đa giác thon nhọn dọc Bézier bậc 2 (polygon fill + viền).
+- **Chiều sâu:** hệ số `0,55 → 1,2` theo `y` (xa nhỏ, gần to); màu pha từ tối sang `canopyLight` theo cùng hệ số.
+- **Lay theo khóm:** mỗi khóm một Node, quay quanh gốc như hoa, pha riêng.
+
+### Vẽ theo độ sâu
+
+`Meadow` gộp hoa và cỏ thành một vật thể (layer `FLOWER`) và vẽ theo **thuật toán hoạ sĩ**: sắp mọi bông và khóm theo `y` gốc tăng dần, vật xa (gốc cao hơn trong hình) vẽ trước. Nhờ vậy vật mọc phía trên không che vật mọc phía dưới, và cỏ có thể mọc xen giữa các bông.
+
+### Vùng đất trống (`ground.ts`)
+
+`isFreeGround(x, y, margin)` kiểm tra 5 điểm (tâm và 4 góc hình vuông cạnh `2·margin`) bằng point-in-polygon (even-odd) với lối đi và gò đất, cộng các vùng chữ nhật: trên chân trời, vùng rễ, và phần đất từ `x = 700` sang phải.
+
+### Khác `layout.md` và issue
+
+- **Chừa đất bên phải** (`x ≥ 700`) cho hồ/suối (#13), cầu (#19) và lá to tiền cảnh (#18): bỏ cụm hoa phải (`x = 815…870`); có thể thêm lại ven bờ khi hồ xong.
+- Cỏ mọc thành khóm rải rác thay cho dải cỏ ở mép dưới (`y = 690…720`).
+- Hoa và cỏ là một vật thể `Meadow` để vẽ theo độ sâu; lớp `Flowers`, `Grass` vẫn dùng riêng được.
