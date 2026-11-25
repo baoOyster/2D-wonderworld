@@ -10,14 +10,26 @@ export {
   BOULDERS,
   Boulders,
   LAKE,
-  LIGHT_DIR,
   PEBBLE_COUNT,
+  REFLECT_ALPHA,
+  REFLECT_FADE,
+  REFLECT_NEAR_ALPHA,
+  REFLECT_SQUASH,
+  ROCK_ASPECT,
+  ROCK_SUBMERGE,
+  ROCK_VERTICES,
+  ROCK_WOBBLE,
   Pebbles,
   boulderShape,
+  clipHorizontal,
+  desaturate,
   generatePebbles,
+  lakeEdgeY,
+  lakePoint,
+  stoneStyle,
   stoneTones,
 } from './rocks.ts';
-export type { BoulderShape, BoulderSpec, Pebble } from './rocks.ts';
+export type { BoulderShape, BoulderSpec, Pebble, StoneTones } from './rocks.ts';
 export {
   HOVER_MAX_LEAN,
   HOVER_RADIUS,
@@ -27,10 +39,8 @@ export {
   REED_SWAY_SPEED,
   Reeds,
   generateClusters,
-  stemCurve,
-  tipAngle,
 } from './reeds.ts';
-export type { ReedCluster, ReedHead, ReedStem } from './reeds.ts';
+export type { ReedBlade, ReedCluster } from './reeds.ts';
 
 /** Tạo các vật thể của vùng đá ven hồ (#20). */
 export function createRocks(): SceneObject[] {

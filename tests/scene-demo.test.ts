@@ -23,7 +23,11 @@ describe('demo toàn cảnh (scene.ts)', () => {
 
   it('nạp được các vùng đã merge trong repo', () => {
     const ids = collectSceneObjects().map((o) => o.id);
-    expect(ids).toEqual(expect.arrayContaining(['tree', 'house', 'fence', 'path', 'meadow']));
+    expect(ids).toEqual(expect.arrayContaining([
+      'tree', 'house', 'fence', 'path', 'meadow',
+      // vùng đá ven hồ (#20) cũng tự hiện nhờ `createRocks()`
+      'pebbles', 'boulders', 'reeds',
+    ]));
   });
 
   it('bấm chọn vật interactive nằm trên cùng, bỏ qua vật không interactive', () => {

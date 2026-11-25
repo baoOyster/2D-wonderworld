@@ -43,7 +43,7 @@ npm test          # Vitest (bổ sung ở #2)
 | `/?demo=midground` | cây cổ thụ, nhà nấm, hàng rào, lối đi, hoa cỏ (#14–#17) |
 | `/` | demo mặc định `gradient`: nền gradient vẽ từng pixel + ô vuông nhấp nháy |
 | `/?demo=primitives` | lưới toạ độ, đường/tròn/elip/đa giác, chữ, tán cây `mask()` + `shape()`, camera 1× và 2× cạnh nhau (#34) |
-| `/?demo=rocks` | đá ven hồ, sỏi, lau sậy trên nền hồ tạm; rê chuột qua cụm sậy để thấy sậy ngả theo con trỏ rồi lay tắt dần (#20) |
+| `/?demo=rocks` | đá ven hồ, sỏi, lau sậy trên nền hồ tạm (nước trong, sáng dần vào giữa, bờ mềm, có phản chiếu — theo ảnh mẫu `B5_ho_da.jpg`); rê chuột qua bụi sậy để thấy sậy ngả theo con trỏ rồi lay tắt dần (#20) |
 | `/?demo=raster` | DDA so với Bresenham, nét dày, Midpoint tròn/elip (#3) |
 | `/?demo=fill` | tô scanline, đa giác tự cắt, flood fill, viền mask (#4) |
 | thêm `&debug=1` | chồng thêm FPS, mức zoom và thời gian vẽ mỗi khung |
@@ -95,11 +95,11 @@ src/
 
 | Thuật toán | Ứng dụng trong cảnh |
 |---|---|
-| DDA | Ván cầu, gợn sóng hồ, cọng cỏ, thân lau sậy |
-| Bresenham | Hàng rào, cành cây, râu bướm, đường đá |
+| DDA | Ván cầu, gợn sóng hồ, cọng cỏ |
+| Bresenham | Hàng rào, cành cây, râu bướm, đường đá, viền lá cỏ và lá lau sậy |
 | Midpoint đường tròn | Mặt trời/trăng, đốm nấm, nhụy hoa, đom đóm |
-| Midpoint elip | Mây, tán cây, hồ, mũ nấm, thân cá, cánh bướm, sỏi, bông sậy |
-| Tô scanline | Núi, thân cây, nhà nấm, đá (thân và mặt), mặt cầu |
+| Midpoint elip | Mây, tán cây, hồ, mũ nấm, thân cá, cánh bướm, sỏi |
+| Tô scanline | Núi, thân cây, nhà nấm, đá, lá lau sậy, mặt cầu |
 | Flood fill | Hốc cây phát sáng |
 | Xử lý ký tự | Font bitmap tự cài đặt, ghép dấu tiếng Việt |
 | Biến đổi 2D | Mây, bướm, hoa, camera |
