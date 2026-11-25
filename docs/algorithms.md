@@ -752,3 +752,78 @@ Mọi object chỉ dùng màu từ `env.palette` (có thể biến đổi bằng
 | Cửa sổ (`window`) | `#c48f5d` | `#f6be61` |
 | Nước (`waterShallow`) | `#7eb5c2` | `#26426c` |
 | Viền (`ink`) | `#34261f` | `#0a0a16` |
+
+## #14 — Cây cổ thụ
+
+File: `src/scene/midground/tree.ts`, demo `src/demo/midground.ts` (`?demo=midground`), test `tests/tree.test.ts`.
+
+### Bộ phận và thuật toán
+
+| Bộ phận | Hình học | Thuật toán |
+|---|---|---|
+| Thân | 1 đa giác 18 đỉnh, loe dần xuống gốc, chẻ thành 2 nhánh ở trên | Scanline polygon fill (even-odd) |
+| Rễ (8) và cành lớn (6) | Đa giác thuôn dọc theo đường gấp khúc (`taperedPolygon`); rễ đối xứng hai bên trục thân | Scanline polygon fill |
+| Vân xoắn (6) | Dải đa giác thuôn chạy chéo trên thân và lưng rễ | Scanline polygon fill |
+| Cành con | Đoạn thẳng rộng 3–5 px, đầu cành chui vào một cụm tán | Nét dày `thickLine` (đóng dấu hình tròn dọc Bresenham) |
+| Vân gỗ | Đường gấp khúc 1 px | Bresenham |
+| Tán (11 cụm) | Mỗi cụm là hợp của 9 hình tròn (1 tâm + 8 thuỳ quanh viền, lệch ngẫu nhiên theo seed) | Midpoint circle, hợp mask |
+| Chùm lá sáng, bụi rêu (7) | Hợp vài hình tròn; mọi bụi rêu gộp một mask | Midpoint circle, hợp mask |
+| Dây leo quấn thân | Đường xoắn ốc chiếu phẳng, lá giọt nước (xem dưới) | Nét dày, scanline polygon fill, hợp mask |
+| Hốc cây | Đa giác 8 đỉnh cao ~62 | Vẽ viền rồi **flood fill** từ điểm gieo bên trong |
+| Quầng sáng, tia phép bay ra từ hốc (đêm) | Hình tròn trong suốt; tia phép là chữ thập 2 đoạn | Midpoint circle + alpha blending, Bresenham |
+
+### Gộp khối, 3 tông và viền
+
+Theo `docs/style-guide.md`: thân, 8 rễ và 2 nhánh đứng yên được thêm vào **cùng một mask**, nên chỗ rễ và nhánh mọc ra khỏi thân không có đường viền thừa. Mask được tô một lần:
+
+1. nền `trunk`;
+2. tông tối `trunkDark` ở mép dưới-trái: `m − shift(m, +2k, −2k)`;
+3. tông sáng `trunkLight` ở mép trên-phải (hướng mặt trời): `m − shift(m, −k, +k)`;
+4. viền `ink` 2 px: biên trong của mask (`maskOutline`).
+
+Bốn cành lay cùng tán là một khối riêng, vẽ ngay trước thân; chỗ nối nằm dưới tán phía trước nên không thấy viền.
+
+Mỗi cụm tán là một mask riêng, tô 3 tông `canopyDark` / `canopy` / `canopyLight` rồi viền, sau đó thêm 3–4 chùm lá sáng lệch về phía nắng. 6 cụm phía sau vẽ trước thân, tối hơn một bậc; 5 cụm phía trước vẽ sau, chồng lên lớp sau nên tán liền một khối.
+
+Ở `taperedPolygon`, pháp tuyến tại mỗi đỉnh là pháp tuyến của vectơ nối đỉnh trước và đỉnh sau. Nửa độ rộng giảm tuyến tính từ `w0/2` tới `w1/2`.
+
+### Flood fill hốc cây
+
+1. Vẽ một vành gỗ tối quanh miệng hốc, rồi vẽ viền hốc (đa giác, nét `ink`).
+2. Gieo tại `HOLLOW_SEED = (250, 332)`: tô mọi pixel liền nhau (4 hướng) cùng màu với điểm gieo, dừng ở viền.
+3. Màu tô đổi theo `dayPhase`: ban ngày gần như đen, ban đêm chuyển dần sang màu đèn `window` (hốc phát sáng phép thuật).
+4. Ban đêm vẽ thêm 4 vòng tròn đồng tâm alpha 0,06–0,14; các vòng chồng lên nhau nên càng gần tâm càng sáng.
+
+### Ánh sáng ban đêm
+
+- **Tia phép bay ra từ hốc (10 tia):** tia `i` có pha `φ = (t/4 + i/10) mod 1`, bay theo hướng chếch lên, dịch ngang theo sin, độ sáng `sin(πφ)`. Hết vòng thì quay lại miệng hốc. Vị trí chỉ phụ thuộc thời gian nên không cần lưu trạng thái. Mỗi tia là ngôi sao 4 cánh (2 đoạn Bresenham) kèm quầng tròn mờ.
+- Cây không vẽ đom đóm: bầy đom đóm là vật thể riêng của #23.
+
+### Biến đổi gộp
+
+```
+root    T(275, 470)                    thân, rễ, nhánh trái: đứng yên
+└─ crown  T(25, −360) · R(θ)           điểm gắn cành (300, 110)
+   └─ cluster[i]  T(cxᵢ − 300, cyᵢ − 110) · R(θᵢ)
+```
+
+- `θ = 0,01 · sin(0,6 t)`, `θᵢ = 0,005 · sin(0,96 t + 0,7 i)`, làm tròn theo bước `0,0005 rad` (đầu cành xa nhất dời dưới 0,5 px mỗi bước).
+- Hình học local tính một lần trong constructor; mỗi frame chỉ đổi góc xoay rồi nhân ma trận `world = parent · local`.
+- Tâm mỗi cụm lấy từ ma trận world của Node cụm. Thuỳ là hình tròn và góc lay rất nhỏ, nên thuỳ chỉ tịnh tiến theo tâm cụm.
+- `hitPolygons()` trả thân, rễ, cành (đã biến đổi) và một elip bao mỗi cụm tán, nên nhấn vào thân hay tán đều chọn được cây.
+
+### Dây leo quấn thân
+
+Vẽ theo ảnh mẫu `B11_day_leo.jpg`: một dây mềm màu lá quấn xoắn ốc quanh thân, lá hình giọt nước mọc so le.
+
+- **Đường trục (helix chiếu phẳng).** Góc quay tăng đều theo chiều cao: `φ(y) = π + 2π(332 − y)/pitch`. Tại độ cao `y`, với `mid`, `half` là tâm và nửa bề rộng thân:
+  `x = mid + (half + 4)·sin φ`, `y' = y + 0,28·half·cos φ` (cung trước võng xuống như nhìn từ trên).
+- **Mặt trước/sau.** Dây ở mặt trước khi `cos φ > −0,25`; chỉ các cung này được vẽ, cung sau bị thân che. Ngưỡng hơi âm để ở hai mép, dây còn lộ ra một chút như đang vòng ra sau.
+- **Chọn bước xoắn.** Hai điều kiện: `φ(486) = −π/2` (dây mọc từ đất ở mép trái thân) và `φ(332) = π` (đoạn ngang hốc cây nằm giữa mặt sau). Khoảng 154 px ứng với ¾ vòng nên `pitch ≈ 205`. Nhờ vậy dây tự tránh hốc mà vẫn cong đều, không phải bẻ dây.
+- **Chân dây.** Một móc Bézier bậc 2 nối từ mặt đất vào đầu cung dưới cùng.
+- **Lá.** Cách đều 38 px dọc cung, so le hai bên, chĩa chéo lên; thêm một lá ở chỗ dây vòng ra sau mép thân. Lá nào chĩa vào hốc thì bỏ. Mọi lá gộp một mask, tô 3 tông `leaf`/`canopyLight` rồi viền; cuống là nét dày, gân là Bresenham.
+- **Thứ tự vẽ.** Sau vân gỗ, trước bụi rêu và hốc cây.
+
+### Hiệu năng
+
+Renderer thật (#34) cấp mask full-frame cho mỗi khối, nên số mask quyết định tốc độ. Cây gộp còn 27 mask mỗi khung (vân xoắn, rêu, chùm lá sáng, lá dây leo mỗi loại một mask; trước là 64). Góc lay được làm tròn theo bước `0,0005 rad` để nhiều khung liên tiếp có hình y hệt nhau. Cả cảnh giữa (cây, nhà, rào, lối đi, hoa cỏ) vẽ khoảng 95–120 ms một khung ở 1920×1080 khi chạy Node; cần cache raster theo hình dạng khối trong renderer (đề xuất cho #26) mới đạt 60 fps.
