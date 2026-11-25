@@ -827,3 +827,48 @@ Vẽ theo ảnh mẫu `B11_day_leo.jpg`: một dây mềm màu lá quấn xoắn
 ### Hiệu năng
 
 Renderer thật (#34) cấp mask full-frame cho mỗi khối, nên số mask quyết định tốc độ. Cây gộp còn 27 mask mỗi khung (vân xoắn, rêu, chùm lá sáng, lá dây leo mỗi loại một mask; trước là 64). Góc lay được làm tròn theo bước `0,0005 rad` để nhiều khung liên tiếp có hình y hệt nhau. Cả cảnh giữa (cây, nhà, rào, lối đi, hoa cỏ) vẽ khoảng 95–120 ms một khung ở 1920×1080 khi chạy Node; cần cache raster theo hình dạng khối trong renderer (đề xuất cho #26) mới đạt 60 fps.
+
+## #15 — Nhà nấm
+
+File: `src/scene/midground/mushroom-house.ts`, test `tests/midground.test.ts`.
+
+### Bộ phận và thuật toán
+
+| Bộ phận | Hình học | Thuật toán |
+|---|---|---|
+| Mũ nấm | Elip `(430, 322, 158, 112)` trừ nửa dưới, hợp với vành elip dẹt | Mask: elip, trừ, hợp; tô 3 tông + viền |
+| Đốm mũ (9) | Hình tròn, chỉ giữ phần nằm trong mũ | Midpoint circle, **clipping** bằng mask mũ |
+| Phiến dưới mũ | Elip dẹt | Midpoint ellipse |
+| Thân nhà | Đa giác loe chân; bóng mũ đổ lên đỉnh thân | Scanline polygon fill, clipping |
+| Cửa vòm | Chữ nhật + nửa tròn; ván, bản lề, vòng gõ | Polygon fill, Bresenham, midpoint circle |
+| Cửa sổ (2) | Tròn, khung chữ thập | Midpoint circle, nét dày |
+| Ống khói, đèn treo | Đa giác; đèn đung đưa quanh móc | Polygon fill, biến đổi quay |
+| Gò đất, bậc thềm (4), búi cỏ | Hình thang, chữ nhật bo góc, tam giác | Scanline polygon fill, gộp mask |
+| Khói (ban ngày) | 7 cụm tròn mờ dần | Midpoint circle + alpha blending |
+| Ánh đèn (ban đêm) | Vòng tròn đồng tâm alpha thấp; vệt sáng từ cửa | Alpha blending |
+
+### Cây Node
+
+```
+root  T(448, 482)                 cả nhà (đã hạ 30 và dịch phải 18)
+├─ cap  T(…)                      mũ, đốm, phiến
+│  └─ capWindow
+├─ doorHinge  T(465, 455) · S(sx, 1)   cánh cửa co ngang về bản lề khi mở
+├─ stemWindow
+└─ lantern  R(0,05·sin 1,3t)      đèn lay quanh móc
+```
+
+### Cửa mở
+
+`onClick()` đổi đích mở/đóng. Mỗi khung, độ mở tiến về đích một bước `dt / 0,6`, nên cửa mở xong trong 0,6 giây dù khung dài hay ngắn. Độ mở qua smoothstep `e = t²(3 − 2t)` rồi đặt `scaleX = 1 − 0,82·e` cho Node bản lề: nhìn từ trước, cánh cửa quay quanh bản lề trông như co ngang. Phía sau cánh cửa là lòng nhà tối (ban ngày) hoặc sáng đèn (ban đêm).
+
+### Khói
+
+Cụm `i` có pha `φ = (t/4,2 + i/7) mod 1`: bay lên 96 px, trôi phải 34 px theo gió, lắc ngang theo sin, bán kính `5 + 13φ`, alpha `0,8·min(1, 6φ)·(1 − φ)`. Hết vòng thì quay lại miệng ống khói. Khói nhân thêm `(1 − dayPhase)` nên tắt dần khi về đêm.
+
+### Khác `layout.md`
+
+- Cả nhà **hạ 30 px** (`HOUSE_DROP`) để chân nhà chạm đất, và **dịch phải 18 px** (`HOUSE_SHIFT`) để không che hốc cây.
+- Thêm gò đất hình thang dưới chân nhà, búi cỏ và 4 bậc thềm bằng nhau (rộng 66, lệch đều 11 px) xuống tới chân gò.
+- Ống khói cao hơn (đỉnh `y = 184`).
+- Kính cửa sổ ban ngày pha `windowGlow` với `window` để không trùng màu trời.
