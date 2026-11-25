@@ -872,3 +872,22 @@ Cụm `i` có pha `φ = (t/4,2 + i/7) mod 1`: bay lên 96 px, trôi phải 34 px
 - Thêm gò đất hình thang dưới chân nhà, búi cỏ và 4 bậc thềm bằng nhau (rộng 66, lệch đều 11 px) xuống tới chân gò.
 - Ống khói cao hơn (đỉnh `y = 184`).
 - Kính cửa sổ ban ngày pha `windowGlow` với `window` để không trùng màu trời.
+
+## #16 — Hàng rào và lối đi
+
+File: `src/scene/midground/fence.ts`, `src/scene/midground/path.ts`, test `tests/midground.test.ts`.
+
+### Hàng rào
+
+- Hai đoạn đứng trên gò đất, chân rào ở `y = 510` (giữa mặt trên và chân gò): đoạn trái 6 trụ trước thân nhà, dừng trước cửa; đoạn phải 2 trụ giữa bậc thềm cuối và mép phải gò.
+- **Biến đổi lặp:** mọi trụ dùng chung một hình mẫu (đa giác 5 đỉnh, đầu vát nhọn, cao 1). Mỗi trụ là một Node `T(xᵢ, yᵢ) · S(1, hᵢ)`, `hᵢ = 38·(0,94 + 0,06·sin(2,3i + x₀))`, nên trụ cao thấp khác nhau một chút mà không cần random.
+- Thanh ngang (2 thanh): nét dày rộng 5, mép trên/dưới kẻ bằng Bresenham; vẽ trước trụ để trụ che mối nối.
+- Mọi trụ một đoạn gộp một mask, tô `fence`/`fenceDark` + viền; chân trụ có bóng elip alpha.
+- **Khác `layout.md`:** đoạn phải còn 2 trụ (layout ghi `x = 556…636`) để không lòi ra ngoài gò; hai đoạn cùng độ cao.
+
+### Lối đi
+
+- **Đường giữa** là Bézier bậc 3 từ `PATH_START` (chân gò) qua `C1`, `C2` tới `PATH_END = (820, 860)`. Điểm cuối nằm hẳn dưới khung hình nên cả mép cuối bị khung cắt.
+- **Chỗ nối** tính từ hằng số của nhà và rào, không gõ tay: mép trái ở giữa đầu rào trái và bậc thềm cuối, mép phải ở giữa bậc thềm cuối và đầu rào phải. Lối đi rộng hơn bậc thềm nhưng không lấn qua rào; dời nhà hay rào thì lối đi tự canh lại.
+- **Đa giác:** 28 mẫu dọc đường giữa, mỗi mẫu dịch theo pháp tuyến `±w(t)/2`, `w(t)` tăng tuyến tính 107 → 290. Mẫu đầu dùng pháp tuyến nằm ngang nên mép trên nằm đúng trên chân gò. Mép trái gợn nhẹ `±7%` theo sin. Mép phải là một đoạn thẳng từ đầu rào phải tới điểm mép cuối, để không cong gắt ở cuối.
+- Tô một mask 3 tông `pathStone`/`pathStoneDark` + viền; 6 phiến đá elip đặt dọc đường giữa theo RNG seed cố định, gộp một mask.
