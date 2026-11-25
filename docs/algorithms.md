@@ -923,3 +923,447 @@ File: `src/scene/foreground/flowers.ts`, `grass.ts`, `ground.ts`, `meadow.ts`, t
 - **Chừa đất bên phải** (`x ≥ 700`) cho hồ/suối (#13), cầu (#19) và lá to tiền cảnh (#18): bỏ cụm hoa phải (`x = 815…870`); có thể thêm lại ven bờ khi hồ xong.
 - Cỏ mọc thành khóm rải rác thay cho dải cỏ ở mép dưới (`y = 690…720`).
 - Hoa và cỏ là một vật thể `Meadow` để vẽ theo độ sâu; lớp `Flowers`, `Grass` vẫn dùng riêng được.
+
+
+---
+
+## #19 — Cầu gỗ: DDA, Bresenham, Polygon Fill và biến đổi 2D
+
+**Người thực hiện:** Trần Viết Thụ  
+**Issue:** #19  
+**Nhánh:** `feat/bridge`  
+**Mã nguồn:** `src/scene/lakeside/bridge.ts`  
+**Kiểm thử:** `tests/bridge.test.ts`
+
+### 1. Mục tiêu
+
+Xây dựng cây cầu gỗ hình vòm bắc qua hồ nước, sử dụng các thuật toán đồ họa 2D đã triển khai trong dự án:
+
+- DDA để vẽ các đường phân chia ván cầu.
+- Bresenham để vẽ trụ, thanh lan can và giằng chéo.
+- Scanline Polygon Fill để tô mặt cầu.
+- Vector tiếp tuyến và pháp tuyến để xác định vị trí ván.
+- Phép tịnh tiến 2D để tạo hiệu ứng nhún khi click.
+- Mask và Alpha Blending để tạo bóng cầu trên mặt nước.
+
+Cầu được xây dựng dưới dạng một SceneObject, có khả năng hiển thị, nhận tương tác và cập nhật trạng thái theo thời gian.
+
+### 2. Hình học cung vòm
+
+Cầu được biểu diễn bằng một cung hình sin với hai chân cầu nằm tại:
+
+- Chân trái: (860, 520).
+- Chân phải: (1120, 520).
+- Đỉnh vòm: (990, 462).
+
+Phương trình tham số:
+
+```text
+x(t) = 860 + 260t
+y(t) = 520 - 58sin(πt)
+
+0 <= t <= 1
+```
+
+Trong đó:
+
+- `t`: tham số xác định vị trí trên cung.
+- `260`: khoảng cách ngang giữa hai chân cầu.
+- `58`: độ cao của vòm so với hai chân cầu.
+- `sin(πt)`: tạo đường cong đối xứng qua tâm cầu.
+
+Các giá trị đặc biệt:
+
+| t | x | y | Vị trí |
+|---|---|---|---|
+| 0 | 860 | 520 | Chân trái |
+| 0.25 | 925 | ≈479 | Sườn trái |
+| 0.5 | 990 | 462 | Đỉnh vòm |
+| 0.75 | 1055 | ≈479 | Sườn phải |
+| 1 | 1120 | 520 | Chân phải |
+
+Hàm `bridgePoint(t)` trả về tọa độ tương ứng trên cung.
+
+Cung được lấy mẫu thành 24 đoạn. Các điểm liên tiếp được nối bằng đoạn thẳng để tạo đường cong xấp xỉ.
+
+Phương pháp này không sử dụng Bézier và phù hợp với yêu cầu dựng hình của Issue #19.
+
+### 3. Xây dựng mặt cầu bằng Polygon Fill
+
+Mặt cầu có độ dày khoảng 12 đơn vị world.
+
+Đường biên phía trên được tạo từ các điểm của cung vòm.
+
+Đường biên phía dưới được xác định bằng cách dịch các điểm trên cung theo hướng pháp tuyến.
+
+Hai đường biên được ghép thành một đa giác khép kín.
+
+Hàm `bridgeDeckPolygon()` thực hiện:
+
+1. Lấy mẫu các điểm trên cung.
+2. Tính vector pháp tuyến tại mỗi điểm.
+3. Dịch điểm theo pháp tuyến để tạo cạnh dưới.
+4. Đảo chiều danh sách điểm cạnh dưới.
+5. Ghép hai danh sách thành đa giác mặt cầu.
+
+Đa giác được tô bằng Scanline Polygon Fill thông qua Renderer.
+
+Màu sắc sử dụng từ Palette:
+
+- `wood`: màu gỗ chính.
+- `woodDark`: vùng tối.
+- `trunkLight`: vùng sáng.
+- `ink`: đường viền.
+
+Cách triển khai này cho phép mặt cầu giữ được độ cong và độ dày tương đối đồng đều.
+
+### 4. Vector tiếp tuyến và pháp tuyến
+
+Để xác định hướng của ván gỗ, sử dụng đạo hàm của cung vòm.
+
+Với:
+
+```text
+x(t) = 860 + 260t
+y(t) = 520 - 58sin(πt)
+```
+
+Vector tiếp tuyến:
+
+```text
+T(t) = (260, -58πcos(πt))
+```
+
+Độ dài vector tiếp tuyến:
+
+```text
+L = sqrt(Tx² + Ty²)
+```
+
+Vector pháp tuyến đơn vị hướng xuống:
+
+```text
+N(t) = (-Ty/L, Tx/L)
+```
+
+Tích vô hướng giữa tiếp tuyến và pháp tuyến bằng 0:
+
+```text
+T(t) · N(t) = 0
+```
+
+Do đó, hai vector vuông góc với nhau.
+
+Hàm `bridgeNormal(t)` tính pháp tuyến tại từng vị trí trên cung.
+
+Vector pháp tuyến được sử dụng để:
+
+- Xác định cạnh dưới mặt cầu.
+- Xác định hướng các khe ván gỗ.
+- Giữ các đoạn ván vuông góc với cung.
+- Tránh phải hardcode tọa độ từng ván.
+
+### 5. Thuật toán DDA – Ván cầu
+
+Cầu được chia thành 20 vị trí phân cách ván, nằm trong yêu cầu 18–22 đoạn của Issue #19.
+
+Vị trí ván thứ i được xác định bởi:
+
+```text
+t = (i + 0.5) / plankCount
+```
+
+Với:
+
+```text
+plankCount = 20
+```
+
+Tại mỗi vị trí:
+
+1. Tính điểm P trên cung bằng `bridgePoint(t)`.
+2. Tính pháp tuyến N bằng `bridgeNormal(t)`.
+3. Xác định hai đầu mút của khe ván theo hướng N.
+4. Vẽ đoạn thẳng bằng thuật toán DDA.
+
+Công thức hai đầu mút:
+
+```text
+A = P + N
+B = P + 11N
+```
+
+Độ dài đoạn ván xấp xỉ 10 đơn vị world.
+
+Thuật toán DDA sử dụng:
+
+```text
+dx = x2 - x1
+dy = y2 - y1
+
+steps = max(|dx|, |dy|)
+
+xIncrement = dx / steps
+yIncrement = dy / steps
+```
+
+Tọa độ pixel được xác định bằng cách cộng gia số và làm tròn qua từng bước.
+
+DDA được lựa chọn vì:
+
+- Phù hợp với các đoạn thẳng ngắn.
+- Dễ tính toán từ tọa độ thực.
+- Thuận tiện khi hai đầu mút được xác định theo pháp tuyến.
+- Có thể điều chỉnh vị trí ván theo độ cong mặt cầu.
+
+Các khe ván sử dụng màu `inkSoft` hoặc `woodDark` từ Palette để tạo sự phân biệt giữa các thanh gỗ.
+
+Độ phức tạp của một đoạn DDA:
+
+```text
+O(max(|dx|, |dy|))
+```
+
+### 6. Thuật toán Bresenham – Lan can
+
+Lan can gồm 7 trụ được phân bố đều theo tham số của cung vòm.
+
+Vị trí trụ thứ i:
+
+```text
+t = i / (postCount - 1)
+
+postCount = 7
+```
+
+Mỗi trụ có chiều cao khoảng 40 đơn vị world.
+
+Các trụ được biểu diễn bằng những đoạn thẳng từ điểm trên mặt cầu đến điểm phía trên.
+
+Hàm `bridgePosts()` tạo dữ liệu hình học cho các trụ.
+
+Các thành phần lan can:
+
+- Trụ đứng: vẽ bằng Bresenham hoặc thickLine.
+- Thanh lan can cong: nối các điểm liên tiếp bằng Bresenham.
+- Giằng chéo: nối giữa các trụ bằng đoạn thẳng mảnh.
+- Đầu trụ: tạo đa giác và tô bằng Polygon Fill.
+
+Bresenham sử dụng biến quyết định để xác định pixel gần đường thẳng lý tưởng.
+
+Đối với đoạn thẳng có:
+
+```text
+dx = |x2 - x1|
+dy = |y2 - y1|
+```
+
+Thuật toán cập nhật sai số qua từng bước, sử dụng phép cộng và trừ để chọn pixel tiếp theo.
+
+Ưu điểm:
+
+- Hạn chế phép toán số thực trong quá trình raster hóa.
+- Đường thẳng liên tục.
+- Phù hợp với các chi tiết lan can và giằng.
+- Có thể kết hợp thickLine để tăng độ dày.
+
+Độ phức tạp mỗi đoạn:
+
+```text
+O(max(|dx|, |dy|))
+```
+
+Mặt cầu, trụ và lan can sử dụng viền `ink` nhằm phân biệt vật thể với nền cảnh.
+
+### 7. Bóng đổ trên mặt hồ
+
+Bóng cầu được biểu diễn bằng một Mask hình elip.
+
+Các thông số hình học:
+
+```text
+Tâm bóng: (990, 540)
+Bán kính ngang: 125
+Bán kính dọc: 15
+```
+
+Quy trình:
+
+1. Tạo một Mask.
+2. Ghi hình elip vào Mask.
+3. Lấy màu bóng từ Palette.
+4. Tô bóng thông qua Renderer.
+5. Đặt bóng phía dưới cầu để tạo cảm giác chiều sâu.
+
+Bóng sử dụng màu tối có alpha để pha trộn với màu mặt nước.
+
+Mục đích của Alpha Blending là tạo bóng mềm về mặt màu sắc, không che hoàn toàn các chi tiết nền.
+
+### 8. Phân lớp và tổ chức SceneObject
+
+Cầu được xây dựng dưới dạng lớp `Bridge` triển khai interface `SceneObject`.
+
+Thông tin vật thể:
+
+```text
+id          = "bridge"
+name        = "Cầu gỗ"
+layer       = BRIDGE (13)
+interactive = true
+```
+
+Các thành phần chính:
+
+- `root`: Node gốc của cầu.
+- `deckNode`: Node quản lý trạng thái tịnh tiến mặt cầu.
+- `update(env)`: cập nhật animation.
+- `draw(renderer, env)`: vẽ cầu.
+- `hitPolygons(env)`: trả về các vùng nhận click.
+- `onClick(ctx)`: xử lý tương tác.
+
+Layer `BRIDGE = 13` được sử dụng để bảo đảm thứ tự hiển thị:
+
+- Cầu nằm trên nước, cá và đá.
+- Cầu nằm dưới các vật thể thuộc lớp cây và nhà.
+
+### 9. Hit-test và tương tác
+
+Cầu hỗ trợ tương tác bằng chuột.
+
+Các vùng nhận click được xây dựng từ đa giác:
+
+- Đa giác mặt cầu.
+- Các trụ lan can.
+- Thanh lan can.
+- Giằng chéo.
+
+Hàm `segmentHitPolygon()` tạo một vùng hình chữ nhật bao quanh đoạn thẳng.
+
+Phương pháp:
+
+1. Xác định vector hướng của đoạn.
+2. Tính độ dài đoạn.
+3. Tính pháp tuyến đơn vị.
+4. Nhân pháp tuyến với độ rộng vùng nhận click.
+5. Tạo bốn đỉnh bao quanh đoạn.
+
+Các vùng được trả về thông qua `hitPolygons()`.
+
+Khi người dùng click vào cầu:
+
+- Hệ thống xác định vật thể được chọn.
+- Gọi `onClick()`.
+- Hiển thị thông tin đối tượng.
+- Khởi động hiệu ứng nhún mặt cầu.
+
+### 10. Animation – Hiệu ứng nhún cầu
+
+Khi người dùng click vào cầu, mặt cầu thực hiện chuyển động nhún nhẹ theo phương thẳng đứng.
+
+Yêu cầu:
+
+- Biên độ khoảng 2–3 pixel.
+- Thời gian khoảng 0,5 giây.
+- Dao động tắt dần.
+- Kết thúc tại vị trí ban đầu.
+
+Hàm dịch chuyển được sử dụng:
+
+```text
+offsetY(t) = 2.8 * e^(-3t) * sin(10πt)
+```
+
+Trong đó:
+
+- `t`: thời gian tính từ lúc click.
+- `2.8`: hệ số biên độ ban đầu.
+- `e^(-3t)`: thành phần làm giảm biên độ.
+- `sin(10πt)`: thành phần dao động.
+
+Giá trị offset được cập nhật trong `update(env)` và áp dụng cho mặt cầu thông qua `deckNode`.
+
+Khi thời gian đạt 0,5 giây:
+
+```text
+offsetY = 0
+animating = false
+```
+
+Điều này bảo đảm mặt cầu trở về vị trí ban đầu sau animation.
+
+### 11. Kiểm thử
+
+File kiểm thử:
+
+`tests/bridge.test.ts`
+
+Các nhóm kiểm thử:
+
+**Hình học:**
+- Hai chân cầu có tọa độ chính xác.
+- Đỉnh vòm nằm gần (990, 462).
+- Có 20 đoạn phân cách ván.
+- Các ván vuông góc với tiếp tuyến.
+- Có 7 trụ lan can.
+- Đa giác mặt cầu có tọa độ hữu hạn.
+
+**SceneObject:**
+- ID và tên vật thể.
+- Layer BRIDGE.
+- Trạng thái interactive.
+- Quan hệ giữa root và deckNode.
+
+**Hit-test:**
+- Đa giác bao quanh đoạn thẳng.
+- Đoạn thẳng có độ dài bằng 0.
+- Vùng nhận click mặt cầu.
+- Vùng nhận click trụ và lan can.
+
+**Animation:**
+- Click chọn đúng vật thể.
+- Mặt cầu dịch chuyển sau click.
+- Độ dịch chuyển không vượt quá 3 đơn vị.
+- Mặt cầu trở về vị trí ban đầu.
+- Click lần nữa khởi động lại hiệu ứng.
+
+Các lệnh kiểm tra:
+
+```bash
+npx vitest run tests/bridge.test.ts
+npm test
+npm run build
+```
+
+### 12. Tích hợp toàn cảnh
+
+Khi tích hợp vào hệ thống World và Renderer, cần xác minh:
+
+- Hai chân cầu tiếp xúc đúng với bờ sau hồ nước.
+- Mặt cầu nằm đúng vị trí trong hệ tọa độ world.
+- Ván gỗ nằm trong vùng mặt cầu.
+- Lan can không bị lệch.
+- Bóng cầu nằm đúng vị trí trên mặt nước.
+- Màu sắc sử dụng Palette ngày/đêm.
+- Viền cầu đủ rõ trong cả hai chế độ.
+- Click mặt cầu và lan can chọn đúng vật thể.
+- Animation hoạt động mượt.
+- Build không có lỗi.
+- Tốc độ hiển thị đạt mục tiêu 60 FPS.
+
+Phần kiểm tra trực quan, ảnh ngày/đêm và đo FPS được thực hiện khi cầu đã tích hợp vào cảnh chung.
+
+### 13. Kết luận
+
+Cầu gỗ kết hợp nhiều thuật toán đồ họa trong một vật thể:
+
+- DDA để tạo các đường phân chia ván.
+- Bresenham để dựng lan can và giằng.
+- Polygon Fill để tô mặt cầu.
+- Vector tiếp tuyến và pháp tuyến để xây dựng hình học.
+- Mask và Alpha Blending để tạo bóng.
+- Node và phép tịnh tiến để thực hiện animation.
+- Hit-test đa giác để xử lý tương tác.
+
+Việc tính toán tọa độ bằng công thức thay vì hardcode từng chi tiết giúp cấu trúc cầu nhất quán, dễ điều chỉnh và thuận tiện khi tích hợp vào cảnh 2D.
+
+
