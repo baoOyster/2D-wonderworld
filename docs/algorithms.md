@@ -1367,3 +1367,83 @@ Cầu gỗ kết hợp nhiều thuật toán đồ họa trong một vật thể
 Việc tính toán tọa độ bằng công thức thay vì hardcode từng chi tiết giúp cấu trúc cầu nhất quán, dễ điều chỉnh và thuận tiện khi tích hợp vào cảnh 2D.
 
 
+
+## #20 — Đá ven hồ, sỏi & lau sậy
+
+File: `src/scene/rocks/rocks.ts` (đá, sỏi), `src/scene/rocks/reeds.ts` (lau sậy), `src/scene/rocks/index.ts` (`createRocks()`).
+Demo: `?demo=rocks` (nền hồ tạm) và `?demo=scene` (`&phase=day` / `&phase=night`). Ảnh: `docs/evidence/issue-20-day.png` / `-night.png` (cận cảnh `?demo=rocks`) và `docs/evidence/issue-20-scene-day.png` / `-scene-night.png` (toàn cảnh `?demo=scene`). Test: `tests/rocks.test.ts` (33 test).
+
+`createRocks()` trả ba vật thể cùng layer `ROCK` (12), đăng ký theo thứ tự **sỏi → đá → sậy**: sỏi nằm dưới (xa), đá lớn giữa, sậy vẽ sau cùng vì mọc trước bờ đá trong hình. Cả ba `interactive: false` (không nhấn chọn, không nhãn), nhưng sậy vẫn phản ứng theo con trỏ (§Ngả theo con trỏ).
+
+**Sửa theo góp ý 25/11** (đối chiếu `B5_ho_da.jpg`): bỏ mặt vát + viền mực (trông như viên đá quý), đá **bo tròn + tông xám**; đá ven hồ **kê đúng mép nước** và có **vệt phản chiếu tối**; lau sậy đổi từ thân tre + bông tròn sang **bụi lá thon nhọn xoè ra**; hồ tạm trong demo vẽ lại theo B5.
+
+**Sửa tiếp theo góp ý 26/11** (xem toàn cảnh `?demo=scene`): bốn tảng tiền cảnh **dời khỏi vùng hoa cỏ và lối đi** (bản trước đè hoa của #17 và một tảng nằm giữa lối đi #16); đá ven hồ **không còn bị cắt nửa chừng ở mực nước** (bản trước để 25% chìm nên nhìn như lơ lửng) — nay mép dưới trùng mực nước, thêm **đường tiếp đất** và vệt phản chiếu **tối hơn nền** nên đá đọc ra là nằm trên mặt đất.
+
+### Đá lớn (8 tảng)
+
+| Bộ phận | Hình học | Thuật toán |
+|---|---|---|
+| Thân tảng | Đa giác `ROCK_VERTICES` = 16 đỉnh trên elip nửa rộng `size` × nửa cao `size·ROCK_ASPECT` (0,66), mỗi đỉnh lệch ±`ROCK_WOBBLE` (7%), đáy kẹp phẳng ở `at.y + size·ROCK_ASPECT` | Scanline polygon fill qua `mask()` + `shape()` |
+| Ba tông | Tối ở mép dưới-trái, sáng ở mép trên-phải (thiên `mushroomSpot`), **không viền** | `shape()` với `shade`/`highlight` (#4, #8) |
+| Vệt phản chiếu (4 tảng ven hồ) | Lật thân qua **đường đáy** (= mực nước cục bộ), ép dọc `REFLECT_SQUASH` = 0,45 và thu hẹp ngang `REFLECT_WIDTH` = 0,8; tô hai lớp (cả vệt `REFLECT_ALPHA` = 0,18 + nửa trên gần chân `REFLECT_NEAR_ALPHA` = 0,16) | Cắt đa giác (`clipHorizontal`) + polygon fill |
+| Đường tiếp đất | Elip `shadow` mảnh (alpha 0,6) ngay dưới đáy tảng ven hồ; tảng trên cỏ dùng bóng đổ elip như cũ | Midpoint ellipse + alpha blending |
+| Cỡ | Nửa bề ngang 22–80 px | RNG seed 2001–2008, sinh một lần trong constructor |
+
+**Tông xám trung tính.** Palette chỉ có `stone` (`#d4bfb4`) và `stoneDark` (`#95847e`) — đều ngả hồng-be, nên `stoneTones()` **bỏ bớt độ bão hoà** (`desaturate`: kéo từng kênh về mức xám trung bình, cùng cách `flowers.ts` tăng bão hoà cho cánh hoa): nền `desaturate(stone, 0,4)`, tối `desaturate(stoneDark, 0,45)`, sáng `lerp(nền, desaturate(mushroomSpot, 0,55), 0,5)`. Bản đầu còn pha `pathStone` cho tông sáng — chính màu đường đất làm tảng ngả hồng/be.
+
+**Vì sao vệt phản chiếu phải tối.** Nó được tô `lerp(desaturate(stoneDark, 0,5), ink, 0,5)` — **tối hơn** cả `waterShallow` lẫn `ground`. Bản trước pha sáng hơn nước nên đọc ra như một tảng thứ hai nằm dưới ⇒ "đá bay lơ lửng" (góp ý 26/11). Vì vậy vệt này đọc đúng cả hai nơi: trên mặt nước là phản chiếu, trên cỏ là bóng, và tảng luôn "chạm đất".
+
+**Đá ngồi ở mép nước.** Bốn tảng ven hồ giữ **hoành độ** `layout.md` (735, 826, 1186, 1136), tung độ suy từ mép elip hồ (`lakeEdgeY(x)`): mép dưới tảng **trùng mực nước** tại `x`, nên đổi `LAKE` thì đá tự canh lại. Không cắt tảng ở mực nước, không tô phần chìm.
+
+**Bốn tảng tiền cảnh dời sang bờ gần** (góp ý 26/11): `(870, 674)` cỡ 42, `(930, 692)` cỡ 24, `(1090, 700)` cỡ 48, `(1210, 684)` cỡ 40. Layout cũ đặt chúng ở `(300,665) (432,660) (495,628) (752,692)` — tức giữa vùng hoa cỏ (#17, chỉ vẽ `x < RESERVED_RIGHT_X = 700`) và một tảng giữa lối đi (#16). Vị trí mới thoả: **không đỉnh nào nằm trong đa giác lối đi**, mọi đỉnh nằm **phải mép phải lối đi**, **trái `x = 700` không còn tảng nào**, không chồng quỹ đạo cá (#21) — cả bốn đúng thế "đá tụ ở bờ hồ" như B5.
+
+**Vì sao cắt đa giác mà không dùng phép toán vùng.** `WorldMask.intersect`/`subtract` quét **cả** framebuffer: đo trên 1920×1080 là ~2,0 ms mỗi phép, còn `mask().polygon()` cho một tảng chỉ ~0,16 ms. Bản dùng phép toán vùng để tách phần chìm/nổi và tô mảng tối mềm tốn **47 ms/khung** cho riêng đá; cắt đa giác còn **1,72 ms** (§Hiệu năng).
+
+### Sỏi (16 viên)
+
+- 16 viên chia cho 5 cụm dọc **cung trên** của elip hồ (tâm `(1010,590)`, `rx 300`, `ry 66` — số liệu `layout.md`): mỗi viên lấy góc lệch trong ô của cụm cộng một chút lệch riêng, hệ số bán kính elip 0,72–1,06 nên có viên trong nước nông, có viên trên bờ, và không rải thành lưới.
+- Vị trí nào chồng lên đá lớn (dưới 0,8 lần cỡ tảng) thì bỏ và thử lại **trong cùng ô** — nhờ vậy vẫn đủ 16 viên dù tảng `(1186, 506)` cỡ 80 chắn gần hết một ô (bản đầu giữ góc cụm cố định nên mất một viên, còn 15).
+- Vẽ bằng **midpoint ellipse** đặc, màu xám như đá lớn (pha thêm `pathStone` cho viên sáng), alpha 0,40–0,75 nên màu đất/nước lộ qua.
+
+### Lau sậy (2 bụi lá, 19 lá)
+
+- Hai bụi ở bờ trái `(742, 612)` và bờ phải `(1248, 556)` hồ (cách tâm hồ 0,95 lần bán kính ⇒ sát mép nước). Mỗi bụi 9–10 lá.
+- **Lá:** đa giác thon nhọn dọc Bézier bậc 2, 5 mẫu, **dùng chung `bladePolygon` của `grass.ts`** (lớp cỏ #17) để cả hai lớp dùng đúng một quy ước lá: chân lá rộng 7–10 px, thon dần tới **một điểm** ở ngọn, tô `lerp(stem, leaf)` → `lerp(leaf, canopyLight)` và viền `ink` (Bresenham).
+- **Quạt:** lá thứ `i` có hệ số `s ∈ [−1, 1]`; lá ngoài cùng nghiêng `|bend|` 18–28 px và **ngắn hơn** 30% (`height · (1 − 0,3|s|)`), lá giữa gần thẳng ⇒ bụi xoè ra chứ không phải chùm que. Cao 55–100 px.
+- **Lay:** mỗi lá một `Node` đặt tại gốc lá, góc `θ = biên độ·sin(1,15·t + pha)`, biên độ 0,02–0,055 rad, pha riêng. Gốc lá đứng yên, chỉ ngọn đung đưa (test kiểm tra gốc không dời).
+- Bóng gốc: một elip `shadow` alpha thấp cho mỗi bụi.
+
+### Ngả theo con trỏ (SPEC #1, cập nhật 25/11: `env.pointer`)
+
+Vật không `interactive` phản ứng theo `env.pointer` và phản ứng phải **tắt dần, trở về trạng thái cũ**. Mỗi lá là một **lò xo–cản bậc hai**:
+
+```
+θ* = biên độ·sin(ωt + φ) + k_hướng·0,5·(1 − d/R)²
+ω' = k·(θ* − θ) − c·ω            k = 42, c = 4,2  ⇒  ζ = c/(2√k) ≈ 0,32
+```
+
+- `d` là khoảng cách con trỏ tới gốc lá, `R = 170` px (bán kính ảnh hưởng); `k_hướng = clamp(atan2(Δx, max(1, −Δy)), −1, 1)` là hướng từ gốc lá tới con trỏ, nên bụi sậy **ngả về phía chuột**, gần gốc thì ngả nhiều hơn (`(1 − d/R)²`).
+- Tích phân 2 bước nhỏ mỗi khung, `dt` kẹp vào `[0; 1/30]` nên ổn định với mọi khung hình.
+- Vì `c < 2√k` (thiếu cản), lá vượt qua vị trí cân bằng rồi **dao động tắt dần**; con trỏ ra khỏi bán kính thì `θ*` trở lại đúng lay theo gió. Test đo độ lệch so với lay theo gió: > 0,03 rad ngay sau khi nhả chuột, dưới 0,02 rad sau 5 giây.
+- Chi phí: 19 lá × 2 bước lặp = 38 phép nhân–cộng mỗi khung, không cấp phát.
+
+### Hiệu năng
+
+Đo bằng `Renderer` thật ở 1920×1080 (Node, một khung, trừ chi phí `begin()` quét cả framebuffer 2,77 ms): **sỏi 0,07 ms; đá 1,72 ms; sậy 0,39 ms; cả ba 2,39 ms**.
+
+- Đá là phần đắt nhất vì mỗi tảng cần **một mask** (mỗi mask là `Uint8Array` full-frame 2 MB phải xoá lại) và mask nhỏ thì chi phí tỉ lệ hộp bao; thêm một lượt `shape()` 3 tông (~0,4 ms, quét hộp bao).
+- Bản đầu tốn 15,5 ms cho riêng đá: mỗi tảng 3 mask (thân + 2 mặt vát) và hai mask mặt phải `clip` theo mask thân.
+- Bản này còn **3 mask cho tảng ven hồ** (vệt phản chiếu, nửa trên đậm hơn, thân) và **1 mask cho tảng trên cỏ** — 16 mask cho cả 8 tảng, không phép toán vùng nào.
+- Hình học (đa giác, đường đáy, đường cắt, vệt lật) tính bằng số học thuần trên 16 điểm; `draw()` chỉ biến đổi và gọi renderer. Vẫn chờ cache raster của renderer ở #26 để bỏ hẳn mask full-frame.
+
+### Kiểm thử (`tests/rocks.test.ts`, 33 test)
+
+- **Hình học:** 8 tảng — 4 ven hồ đúng hoành độ `layout.md`, 4 tiền cảnh `(870,674) (930,692) (1090,700) (1210,684)`; cỡ 14–85 px, có tảng lớn ≥ 80 và tảng nhỏ ≤ 30; mỗi tảng 16 đỉnh nằm sát elip `size × size·0,66` (lệch ±7%), đáy phẳng, không còn dải đỉnh phụ (không mặt vát); cùng seed ⇒ cùng hình.
+- **Mép nước:** tảng ven hồ có `baseY = lakeEdgeY(x)` đúng 1e-9, **không đỉnh nào chìm dưới mực nước**; tảng trên cỏ có đáy = `at.y + size·ROCK_ASPECT`.
+- **Cắt đa giác:** `clipHorizontal` giữ đúng nửa trên/nửa dưới, thêm hai đỉnh trên đường cắt, và đường cắt ngoài đa giác thì một nửa rỗng.
+- **Tông đá:** nền là `desaturate(stone, 0,4)`, khoảng cách kênh đỏ–lam **thu lại** so với `stone` (⇒ hết ngả hồng/be), ba tông sáng dần `shade < fill < highlight`, mọi tông đổi theo palette ngày/đêm; **vệt phản chiếu tối hơn `fill`, `waterShallow` và `ground`** (⇒ không "bay lơ lửng").
+- **Sỏi:** đủ 16 viên, nằm trong dải bán kính 0,72–1,06 của elip hồ, không đè đá lớn, khoảng cách tới viên gần nhất lệch nhau (không phải lưới).
+- **Sậy:** 2 bụi, 9–10 lá/bụi, lá dài 55–100 px, quạt có lá nghiêng cả hai phía và lá giữa gần thẳng; lá thon nhọn (chân rộng `width`, ngọn là một điểm); lay đúng `biên độ·sin(ωt + φ)`; ngả đúng hướng con trỏ; nhả chuột thì tắt dần và về trạng thái cũ.
+- **`draw()`:** mỗi tảng một lượt tô **3 tông, không viền** (bản đầu viền `ink` 2 px); tảng ven hồ có **hai lớp phản chiếu** (hai alpha khác nhau) + một elip tiếp đất; tảng trên cỏ có elip bóng chân; **không gọi `intersect`/`subtract` trên mask** (giữ chi phí thấp); sậy vẽ mỗi lá một đa giác tô + viền, không còn `line` DDA hay mask bông; toạ độ ngọn lá lệch theo hướng con trỏ.
+- **Pixel thật:** tâm tảng đá đúng tông xám suy từ `stone` của palette đang dùng (`0` pixel mang `stone` gốc ⇒ không ngả hồng/be, và `0` pixel mang màu của palette bên kia); **ngay dưới chân tảng ven hồ có vệt phản chiếu và nó tối hơn nền**, còn quá sâu thì **không** vẽ gì (vệt không tràn ra xa); tảng trên cỏ có bóng chân; pixel viên sỏi/phiến lá khác nhau giữa ngày và đêm ⇒ không hardcode màu.
+- **Ràng buộc bố cục:** 120 điểm trên quỹ đạo elip bơi của cá (#21) đều nằm ngoài mọi tảng đá; không đỉnh nào của tảng tiền cảnh nằm trong đa giác lối đi và **cả bốn tảng đều ở phải mép phải lối đi**; **không tảng nào lấn qua `RESERVED_RIGHT_X` (700)** của vùng hoa cỏ (#17) — test cũng kiểm tra toạ độ cũ `(300,665)` và `(752,692)` đúng là vi phạm hai điều này; `layer` của cả ba vật thể < `BRIDGE` (13) nên đá không đè cầu.
