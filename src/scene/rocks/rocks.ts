@@ -9,11 +9,10 @@
  *   `stoneDark` ở mép dưới-trái, tông sáng ở mép trên-phải theo hướng sáng
  *   trên-phải của `docs/style-guide.md`. Đá **không viền `ink`**: viền dày biến
  *   tảng thành viên đá quý (góp ý 25/11, và "tránh viền đen dày" trong issue #20).
- * - **Tách theo mực nước**: tảng ven hồ = `thân ∩ (nửa mặt phẳng dưới mực nước)`
- *   (phần chìm, tô pha màu nước) hợp `thân − (nửa mặt phẳng)` (phần nổi, tô đá đầy
- *   đủ), nên đá "ngồi" ở mép nước chứ không đứng trên cỏ.
- * - **Phản chiếu**: lật thân qua mực nước, ép dọc rồi cắt xuống dưới mực nước, tô
- *   alpha thấp — vệt phản chiếu dưới chân tảng như ảnh mẫu `B5_ho_da.jpg`.
+ * - **Đá ở mép nước**: mép dưới tảng đặt đúng mực nước tại hoành độ của nó; không
+ *   cắt tảng ở mực nước (bản trước để 25% chìm dưới nước nên trông lơ lửng).
+ * - **Phản chiếu**: lật thân qua đường đáy rồi ép dọc, tô **tối hơn** nền và mờ
+ *   dần theo chiều sâu — vệt phản chiếu dưới chân tảng như ảnh mẫu `B5_ho_da.jpg`.
  * - **Midpoint ellipse + alpha blending**: bóng đổ dưới chân tảng trên cỏ, và 16
  *   viên sỏi elip alpha nhẹ.
  *
@@ -35,21 +34,19 @@ export const LAKE = { cx: 1010, cy: 590, rx: 300, ry: 66 } as const;
 /** Nửa cao / nửa rộng của tảng: đá bẹt và bo tròn, không phải khối đa diện. */
 export const ROCK_ASPECT = 0.66;
 
-/** Phần chiều cao tảng chìm dưới mực nước (tảng ven hồ). */
-export const ROCK_SUBMERGE = 0.25;
-
 /** Số đỉnh của viền bo tròn (đủ nhiều để thấy mềm, đủ ít để còn "vẽ tay"). */
 export const ROCK_VERTICES = 16;
 
 /** Bán kính mỗi đỉnh lệch ngẫu nhiên ±7% quanh elip. */
 export const ROCK_WOBBLE = 0.07;
 
-/** Vệt phản chiếu: hệ số ép dọc, alpha phần xa, alpha cộng thêm ở phần gần mực nước. */
-export const REFLECT_SQUASH = 0.7;
-export const REFLECT_ALPHA = 0.12;
-export const REFLECT_NEAR_ALPHA = 0.14;
+/** Vệt phản chiếu: hệ số ép dọc, hệ số thu hẹp ngang so với thân, alpha. */
+export const REFLECT_SQUASH = 0.45;
+export const REFLECT_WIDTH = 0.8;
+export const REFLECT_ALPHA = 0.18;
+export const REFLECT_NEAR_ALPHA = 0.16;
 /** Phần trên của vệt phản chiếu (tính theo chiều sâu vệt) được tô đậm hơn. */
-export const REFLECT_FADE = 0.45;
+export const REFLECT_FADE = 0.5;
 
 /** Điểm trên mép elip hồ theo góc (rad), `y` hướng xuống như toạ độ world. */
 export function lakePoint(angle: number): Vec2 {
@@ -73,41 +70,41 @@ export interface BoulderSpec {
 }
 
 /**
- * Tảng ven hồ: giữ hoành độ, hạ tâm xuống sao cho mép dưới chìm đúng
- * `ROCK_SUBMERGE` chiều cao dưới mực nước tại `x`. Nhờ vậy đá luôn nằm ở mép
- * nước, không đứng trên cỏ cách hồ một quãng.
+ * Tảng ven hồ: giữ hoành độ, hạ tâm xuống sao cho **mép dưới nằm đúng mực nước**
+ * tại `x` — đá kê trên bờ, mặt nước chạm chân đá. Không cắt tảng ở mực nước nữa
+ * (bản trước để 25% chìm dưới nước nên nhìn như đang lơ lửng — góp ý 25/11).
  */
 function shoreRock(x: number, size: number, seed: number): BoulderSpec {
-  const halfHeight = size * ROCK_ASPECT;
-  return { at: vec2(x, lakeEdgeY(x) - halfHeight * (1 - 2 * ROCK_SUBMERGE)), size, seed, shore: true };
+  return { at: vec2(x, lakeEdgeY(x) - size * ROCK_ASPECT), size, seed, shore: true };
 }
 
 /**
  * 8 tảng đá của issue #20. Thứ tự: 4 tảng ven hồ (trái sang phải) rồi 4 tảng
- * tiền cảnh, để vẽ theo thứ tự này (xa trước, gần sau). Tảng tiền cảnh thứ tư
- * dời sang **mép phải lối đi** (lối đi ở `y = 692` rộng `x ≈ 564…809`), không
- * còn nằm giữa lối đi như bản đầu.
+ * tiền cảnh trên bờ gần, để vẽ theo thứ tự này (xa trước, gần sau).
+ *
+ * Bốn tảng tiền cảnh **dời khỏi vùng hoa cỏ và lối đi** (góp ý 25/11): layout cũ
+ * đặt chúng ở `x = 300...752`, tức giữa vùng hoa cỏ (#17) và một tảng nằm giữa lối
+ * đi (#16). Nay cả bốn ở bờ gần hồ, `x ≥ 700` (ngoài `RESERVED_RIGHT_X` của lớp
+ * hoa cỏ) và nằm phải mép phải lối đi — đúng thế "đá tụ ở bờ hồ" như B5.
  */
 export const BOULDERS: readonly BoulderSpec[] = [
   shoreRock(735, 62, 2001),
   shoreRock(826, 44, 2002),
   shoreRock(1186, 80, 2003),
   shoreRock(1136, 52, 2004),
-  { at: vec2(300, 665), size: 78, seed: 2005, shore: false },
-  { at: vec2(432, 660), size: 34, seed: 2006, shore: false },
-  { at: vec2(495, 628), size: 18, seed: 2007, shore: false },
-  { at: vec2(880, 696), size: 46, seed: 2008, shore: false },
+  { at: vec2(870, 674), size: 42, seed: 2005, shore: false },
+  { at: vec2(930, 692), size: 24, seed: 2006, shore: false },
+  { at: vec2(1090, 700), size: 48, seed: 2007, shore: false },
+  { at: vec2(1210, 684), size: 40, seed: 2008, shore: false },
 ];
 
-/** Hình một tảng: biên ngoài bo tròn và các mực để tách phần nổi/phần chìm. */
+/** Hình một tảng: biên ngoài bo tròn và đường đáy. */
 export interface BoulderShape {
   readonly outline: readonly Vec2[];
   /** Nửa bề ngang (cỡ khai báo của tảng). */
   readonly size: number;
-  /** Đường đáy của thân (mép dưới cùng). */
+  /** Đường đáy của thân: khi ở mép hồ thì đây cũng là mực nước cục bộ. */
   readonly baseY: number;
-  /** Mực nước cục bộ; bằng `baseY` khi tảng nằm trên cỏ. */
-  readonly waterY: number;
   readonly shore: boolean;
 }
 
@@ -124,7 +121,7 @@ export function desaturate(c: RGBA, keep: number): RGBA {
   return pack(f(r), f(g), f(b), a);
 }
 
-/** Sáu tông đá suy ra từ palette; không hardcode màu cảnh. */
+/** Bốn tông đá suy ra từ palette; không hardcode màu cảnh. */
 export interface StoneTones {
   /** Màu nền thân đá. */
   readonly fill: RGBA;
@@ -132,10 +129,7 @@ export interface StoneTones {
   readonly shade: RGBA;
   /** Tông sáng ở mép trên-phải. */
   readonly highlight: RGBA;
-  /** Phần thân chìm dưới nước (đã pha màu nước và alpha). */
-  readonly submerged: RGBA;
-  readonly submergedShade: RGBA;
-  /** Màu vệt phản chiếu trên mặt nước (vẽ với `REFLECT_ALPHA`). */
+  /** Màu vệt phản chiếu, **tối hơn** mặt nước (vẽ với `REFLECT_ALPHA`). */
   readonly reflection: RGBA;
 }
 
@@ -148,10 +142,9 @@ export function stoneTones(p: Palette): StoneTones {
     // Tông sáng: xám nhạt hơn ở mép trên-phải; không pha `pathStone` (màu đường
     // đất làm tảng ngả hồng/be — góp ý 25/11).
     highlight: lerpColor(fill, desaturate(p.mushroomSpot, 0.55), 0.5),
-    // Phần chìm trong nước nông: đá pha màu nước nên nhạt và ngả xanh.
-    submerged: withAlpha(lerpColor(fill, p.waterShallow, 0.45), 0.75),
-    submergedShade: withAlpha(lerpColor(p.stoneDark, p.waterDeep, 0.5), 0.6),
-    reflection: lerpColor(fill, p.waterDeep, 0.25),
+    // Vệt phản chiếu **tối hơn** nền (nước hoặc cỏ). Bản trước pha sáng hơn nước
+    // nên đọc ra như một tảng thứ hai nằm dưới => "đá bay lơ lửng" (góp ý 25/11).
+    reflection: lerpColor(desaturate(p.stoneDark, 0.5), p.ink, 0.5),
   };
 }
 
@@ -177,8 +170,7 @@ export function boulderShape(spec: BoulderSpec): BoulderShape {
   }
   const baseY = spec.at.y + halfHeight;
   for (const p of outline) if (p.y > baseY) p.y = baseY;
-  const waterY = spec.shore ? lakeEdgeY(spec.at.x) : baseY;
-  return { outline, size: spec.size, baseY, waterY, shore: spec.shore };
+  return { outline, size: spec.size, baseY, shore: spec.shore };
 }
 
 /**
@@ -283,38 +275,29 @@ export class Boulders implements SceneObject {
       const shape = this.shapes[i];
 
       if (shape.shore) {
-        // Mực nước cục bộ của tảng: cắt **hình học** (nửa mặt phẳng ngang) thay
-        // cho phép toán vùng trên mask — mỗi `intersect`/`subtract` quét cả
-        // framebuffer nên đắt gấp mười lần tô một mask nhỏ.
-        const above = clipHorizontal(shape.outline, shape.waterY, true);
-        const below = clipHorizontal(shape.outline, shape.waterY, false);
+        // Vệt phản chiếu: lật thân qua đường đáy (= mực nước cục bộ) rồi ép dọc.
+        // Tô tối hơn nền nên đọc ra là bóng/phản chiếu, không phải tảng thứ hai;
+        // lớp gần chân đậm hơn để vệt mờ dần theo chiều sâu.
         const topY = Math.min(...shape.outline.map((v) => v.y));
-        const depth = (shape.waterY - topY) * REFLECT_SQUASH;
-        // Lật thân phần nổi qua mực nước rồi ép dọc: vệt phản chiếu nằm hẳn dưới
-        // mực nước nên không cần cắt theo vùng nước nữa.
-        const mirrored = above.map((v) => vec2(v.x, shape.waterY + (shape.waterY - v.y) * REFLECT_SQUASH));
-        const near = clipHorizontal(mirrored, shape.waterY + depth * REFLECT_FADE, true);
-
-        // Vệt phản chiếu mờ dần theo chiều sâu: tô cả vệt, rồi tô đậm thêm phần
-        // gần mực nước.
-        if (mirrored.length >= 3) {
-          r.shape(r.mask().polygon(mirrored), { fill: withAlpha(tone.reflection, REFLECT_ALPHA) });
-        }
+        const depth = (shape.baseY - topY) * REFLECT_SQUASH;
+        const mirrored = shape.outline.map((v) => vec2(
+          spec.at.x + (v.x - spec.at.x) * REFLECT_WIDTH,
+          shape.baseY + (shape.baseY - v.y) * REFLECT_SQUASH,
+        ));
+        r.shape(r.mask().polygon(mirrored), { fill: withAlpha(tone.reflection, REFLECT_ALPHA) });
+        const near = clipHorizontal(mirrored, shape.baseY + depth * REFLECT_FADE, true);
         if (near.length >= 3) {
           r.shape(r.mask().polygon(near), { fill: withAlpha(tone.reflection, REFLECT_NEAR_ALPHA) });
         }
-
-        // Phần chìm dưới mực nước: tô pha màu nước nên mờ và ngả xanh.
-        if (below.length >= 3) {
-          r.shape(r.mask().polygon(below), {
-            fill: tone.submerged,
-            shade: tone.submergedShade,
-            highlight: tone.submerged,
-          });
-        }
-
-        // Phần nổi trên mặt nước: đá tô 3 tông đầy đủ, không viền.
-        if (above.length >= 3) r.shape(r.mask().polygon(above), stoneStyle(tone));
+        // Đường tiếp đất mảnh ngay dưới đáy: tảng "kê" trên bờ, không lơ lửng.
+        r.ellipse(
+          spec.at.x,
+          shape.baseY + spec.size * 0.04,
+          spec.size * 0.78,
+          spec.size * 0.09,
+          withAlpha(p.shadow, 0.6),
+          true,
+        );
       } else {
         // Bóng đổ dưới chân: elip alpha thấp, không viền.
         r.ellipse(
@@ -325,8 +308,9 @@ export class Boulders implements SceneObject {
           p.shadow,
           true,
         );
-        r.shape(r.mask().polygon(shape.outline), stoneStyle(tone));
       }
+
+      r.shape(r.mask().polygon(shape.outline), stoneStyle(tone));
     }
   }
 }

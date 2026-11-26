@@ -8,6 +8,7 @@ import { withAlpha } from '../src/core/color.ts';
 import { Renderer } from '../src/core/renderer.ts';
 import { vec2, type Vec2 } from '../src/core/vec2.ts';
 import { pathPolygon } from '../src/scene/midground/path.ts';
+import { RESERVED_RIGHT_X } from '../src/scene/foreground/ground.ts';
 import { bladePolygon } from '../src/scene/foreground/grass.ts';
 import {
   BOULDERS,
@@ -23,7 +24,6 @@ import {
   REED_STIFFNESS,
   REED_SWAY_SPEED,
   ROCK_ASPECT,
-  ROCK_SUBMERGE,
   ROCK_VERTICES,
   ROCK_WOBBLE,
   Boulders,
@@ -105,8 +105,8 @@ describe('hình học đá theo layout.md', () => {
   it('đủ 8 tảng: 4 ven hồ đúng hoành độ layout, 4 tiền cảnh', () => {
     expect(BOULDERS).toHaveLength(8);
     expect(SHORE.map((b) => b.at.x)).toEqual([735, 826, 1186, 1136]);
-    expect(FOREGROUND.map((b) => b.at.x)).toEqual([300, 432, 495, 880]);
-    expect(FOREGROUND.map((b) => b.at.y)).toEqual([665, 660, 628, 696]);
+    expect(FOREGROUND.map((b) => b.at.x)).toEqual([870, 930, 1090, 1210]);
+    expect(FOREGROUND.map((b) => b.at.y)).toEqual([674, 692, 700, 684]);
   });
 
   it('cỡ mỗi tảng trong 14–85 px, có cả tảng lớn và tảng nhỏ', () => {
@@ -114,7 +114,7 @@ describe('hình học đá theo layout.md', () => {
       expect(b.size).toBeGreaterThanOrEqual(14);
       expect(b.size).toBeLessThanOrEqual(85);
     }
-    expect(Math.min(...BOULDERS.map((b) => b.size))).toBeLessThan(20);
+    expect(Math.min(...BOULDERS.map((b) => b.size))).toBeLessThanOrEqual(30);
     expect(Math.max(...BOULDERS.map((b) => b.size))).toBeGreaterThanOrEqual(80);
   });
 
@@ -168,23 +168,21 @@ describe('hình học đá theo layout.md', () => {
     expect(clipHorizontal(square, -5, false)).toEqual(square);
   });
 
-  it('tảng ven hồ ngồi ở mép nước và chìm ROCK_SUBMERGE chiều cao', () => {
+  it('tảng ven hồ kê đúng mép nước: mép dưới trùng mực nước, không cắt nửa chừng', () => {
     for (const spec of SHORE) {
       const shape = boulderShape(spec);
-      const halfHeight = spec.size * ROCK_ASPECT;
       expect(shape.shore).toBe(true);
-      expect(shape.waterY).toBeCloseTo(lakeEdgeY(spec.at.x), 9);
-      // Mép dưới chìm đúng ROCK_SUBMERGE chiều cao dưới mực nước
-      const submerged = shape.baseY - shape.waterY;
-      expect(submerged).toBeCloseTo(ROCK_SUBMERGE * 2 * halfHeight, 9);
-      // Đá nằm ở mép nước: tâm không được nổi lên tận đỉnh elip hồ
-      expect(shape.waterY).toBeGreaterThan(LAKE.cy - LAKE.ry);
+      // Mép dưới = mực nước tại hoành độ tảng (đá nằm trên bờ, nước chạm chân)
+      expect(shape.baseY).toBeCloseTo(lakeEdgeY(spec.at.x), 9);
+      // Cả thân nằm trên mực nước: không đỉnh nào chìm dưới mực nước
+      expect(Math.max(...shape.outline.map((p) => p.y))).toBeLessThanOrEqual(shape.baseY + 1e-9);
+      expect(shape.baseY).toBeGreaterThan(LAKE.cy - LAKE.ry);
     }
     for (const spec of FOREGROUND) {
       const shape = boulderShape(spec);
       expect(shape.shore).toBe(false);
-      // Trên cỏ: mực nước bằng đáy, không có phần chìm
-      expect(shape.waterY).toBe(shape.baseY);
+      // Trên cỏ: không có mực nước, đáy là mặt đất
+      expect(shape.baseY).toBe(spec.at.y + spec.size * ROCK_ASPECT);
     }
   });
 
@@ -209,7 +207,7 @@ describe('tông đá', () => {
     expect(lum(day.highlight)).toBeGreaterThan(lum(day.fill));
     // Mọi tông đều suy từ palette: đổi palette ⇒ đổi tông, không hardcode
     const night = stoneTones(NIGHT);
-    for (const key of ['fill', 'shade', 'highlight', 'submerged', 'reflection'] as const) {
+    for (const key of ['fill', 'shade', 'highlight', 'reflection'] as const) {
       expect(night[key]).not.toBe(day[key]);
     }
   });
@@ -401,7 +399,7 @@ describe('draw()', () => {
     polyline: () => { ops.push('polyline'); },
   } as unknown as Renderer);
 
-  it('đá: tô 3 tông, không viền `ink`; tảng ven hồ tách phần chìm và vẽ phản chiếu', () => {
+  it('đá: tô 3 tông, không viền `ink`; tảng ven hồ có vệt phản chiếu + đường tiếp đất', () => {
     for (const palette of [DAY, NIGHT]) {
       const tone = stoneTones(palette);
       const styles: Record<string, unknown>[] = [];
@@ -416,7 +414,7 @@ describe('draw()', () => {
         expect(style.shade).toBe(tone.shade);
         expect(style.highlight).toBe(tone.highlight);
       }
-      // Ven hồ: hai lớp phản chiếu (xa mờ, gần đậm hơn) + phần chìm
+      // Ven hồ: hai lớp phản chiếu (cả vệt mờ + phần gần chân đậm hơn)
       const reflections = styles.filter((s) => (s.fill as number) >>> 8 === tone.reflection >>> 8);
       expect(reflections).toHaveLength(2 * SHORE.length);
       const alphas = new Set(reflections.map((s) => (s.fill as number) & 0xff));
@@ -424,10 +422,8 @@ describe('draw()', () => {
         withAlpha(tone.reflection, REFLECT_ALPHA) & 0xff,
         withAlpha(tone.reflection, REFLECT_NEAR_ALPHA) & 0xff,
       ]));
-      const submerged = styles.filter((s) => s.fill === tone.submerged);
-      expect(submerged).toHaveLength(SHORE.length);
-      // Bóng chân chỉ cho tảng trên cỏ (tảng ven hồ có phản chiếu)
-      expect(ops.filter((o) => o === 'ellipse')).toHaveLength(FOREGROUND.length);
+      // Mỗi tảng một elip: bóng chân (trên cỏ) hoặc đường tiếp đất (ven hồ)
+      expect(ops.filter((o) => o === 'ellipse')).toHaveLength(BOULDERS.length);
       // Không còn đa giác phụ bị cắt trong thân (mặt vát của bản đầu)
       expect(ops.filter((o) => o === 'clip')).toHaveLength(0);
       // Không dùng phép toán vùng trên mask (quét cả framebuffer): tách theo mực
@@ -436,14 +432,23 @@ describe('draw()', () => {
     }
   });
 
-  it('phản chiếu nằm dưới mực nước: lật qua mực nước rồi ép dọc', () => {
+  it('phản chiếu lật qua đường đáy và ngắn hơn thân: vệt nằm dưới chân đá', () => {
     const shape = boulderShape(SHORE[0]);
-    // Điểm thấp nhất của thân lật xuống dưới mực nước một đoạn bằng
-    // (mực nước − đỉnh thân) · REFLECT_SQUASH
     const top = Math.min(...shape.outline.map((p) => p.y));
-    const mirrored = shape.waterY + (shape.waterY - top) * REFLECT_SQUASH;
-    expect(mirrored).toBeGreaterThan(shape.waterY);
-    expect(mirrored).toBeLessThan(shape.waterY + (shape.waterY - top));
+    const mirrored = shape.baseY + (shape.baseY - top) * REFLECT_SQUASH;
+    expect(mirrored).toBeGreaterThan(shape.baseY);
+    expect(mirrored).toBeLessThan(shape.baseY + (shape.baseY - top));
+  });
+
+  it('vệt phản chiếu tối hơn nền: đá không "bay lơ lửng" (góp ý 25/11)', () => {
+    for (const palette of [DAY, NIGHT]) {
+      const tone = stoneTones(palette);
+      const lum = (c: number): number =>
+        (((c >>> 24) & 0xff) + ((c >>> 16) & 0xff) + ((c >>> 8) & 0xff)) / 3;
+      expect(lum(tone.reflection)).toBeLessThan(lum(tone.fill));
+      expect(lum(tone.reflection)).toBeLessThan(lum(palette.waterShallow));
+      expect(lum(tone.reflection)).toBeLessThan(lum(palette.ground));
+    }
   });
 
   it('sỏi vẽ bằng elip alpha < 255 theo palette', () => {
@@ -555,15 +560,19 @@ describe('renderer thật: pixel theo palette ngày/đêm', () => {
     expect(night.data).not.toEqual(day.data);
   });
 
-  it('tảng ven hồ: pixel dưới mực nước là phần chìm + phản chiếu, không tràn ra giữa hồ', () => {
+  it('tảng ven hồ: dưới chân là vệt phản chiếu tối hơn nền, không tràn ra xa', () => {
     const fb = render(DAY, (r, env) => new Boulders().draw(r, env));
     const shore = SHORE[0];
     const shape = boulderShape(shore);
     const halfHeight = shore.size * ROCK_ASPECT;
-    // Ngay dưới mực nước: có vẽ gì đó (phần chìm và/hoặc phản chiếu)
-    expect(pixel(fb, vec2(shore.at.x, shape.waterY + 0.3 * halfHeight))).not.toBe(DAY.skyBottom);
+    const bgLum = (((DAY.skyBottom >>> 24) & 0xff) + ((DAY.skyBottom >>> 16) & 0xff) + ((DAY.skyBottom >>> 8) & 0xff)) / 3;
+    const lum = (c: number): number => (((c >>> 24) & 0xff) + ((c >>> 16) & 0xff) + ((c >>> 8) & 0xff)) / 3;
+    // Ngay dưới chân: có vệt phản chiếu và nó **tối hơn** nền (không phải tảng sáng thứ hai)
+    const near = pixel(fb, vec2(shore.at.x, shape.baseY + 0.3 * halfHeight));
+    expect(near).not.toBe(DAY.skyBottom);
+    expect(lum(near)).toBeLessThan(bgLum);
     // Xa dưới chân (quá vệt phản chiếu): không vẽ gì
-    expect(pixel(fb, vec2(shore.at.x, shape.waterY + 2.5 * halfHeight))).toBe(DAY.skyBottom);
+    expect(pixel(fb, vec2(shore.at.x, shape.baseY + 3 * halfHeight))).toBe(DAY.skyBottom);
   });
 
   it('tảng trên cỏ có bóng chân làm pixel quanh chân đá khác nền', () => {
@@ -612,32 +621,31 @@ describe('ràng buộc bố cục', () => {
     }
   });
 
-  it('đá tiền cảnh không nằm giữa lối đi (#16): không tảng nào lấn vào lối đi', () => {
+  it('đá tiền cảnh không lấn lối đi (#16): cả bốn tảng nằm phải mép phải lối đi', () => {
     const path = pathPolygon();
     for (const spec of FOREGROUND) {
       const shape = boulderShape(spec);
       expect(shape.outline.some((p) => inside(p, path)), `${spec.at.x},${spec.at.y}`).toBe(false);
-    }
-    // Ba tảng đầu ở bên trái lối đi: mép phải tảng vẫn nằm trái mép trái lối đi
-    for (const spec of FOREGROUND.slice(0, 3)) {
       const edges = pathEdges(spec.at.y);
-      expect(edges).not.toBeNull();
-      expect(Math.max(...boulderShape(spec).outline.map((p) => p.x)))
-        .toBeLessThan((edges as { left: number }).left);
+      expect(edges, `${spec.at.x},${spec.at.y}`).not.toBeNull();
+      expect(Math.min(...shape.outline.map((p) => p.x)))
+        .toBeGreaterThan((edges as { right: number }).right);
     }
+    // Trường hợp cũ (752, 692) đúng là nằm trong lối đi — test này giữ lý do dời đá
+    const old = boulderShape({ at: vec2(752, 692), size: 46, seed: 2005, shore: false });
+    expect(Math.min(...old.outline.map((p) => p.x))).toBeLessThan(
+      (pathEdges(692) as { right: number }).right,
+    );
   });
 
-  it('tảng tiền cảnh thứ tư dời sang mép phải lối đi (bản đầu nằm giữa lối đi)', () => {
-    const beside = FOREGROUND[3];
-    const edges = pathEdges(beside.at.y);
-    expect(edges).not.toBeNull();
-    const left = Math.min(...boulderShape(beside).outline.map((p) => p.x));
-    const gap = left - (edges as { right: number }).right;
-    expect(gap).toBeGreaterThan(0);
-    expect(gap).toBeLessThan(60);
-    // Bản đầu đặt ở (752, 692) — giữa lối đi, cách mép phải lối đi một đoạn âm
-    const old = boulderShape({ at: vec2(752, 692), size: beside.size, seed: 2008, shore: false });
-    expect(Math.min(...old.outline.map((p) => p.x)) - (edges as { right: number }).right).toBeLessThan(0);
+  it('đá tiền cảnh ra khỏi vùng hoa cỏ (#17): không tảng nào lấn qua RESERVED_RIGHT_X', () => {
+    for (const spec of FOREGROUND) {
+      const b = bbox(boulderShape(spec).outline);
+      expect(b.x0, `${spec.at.x},${spec.at.y}`).toBeGreaterThanOrEqual(RESERVED_RIGHT_X);
+    }
+    // Toạ độ cũ trong layout.md (300, 665) nằm giữa vùng hoa cỏ — lý do phải dời
+    const old = boulderShape({ at: vec2(300, 665), size: 78, seed: 2005, shore: false });
+    expect(bbox(old.outline).x0).toBeLessThan(RESERVED_RIGHT_X);
   });
 
   it('đá và sậy nằm dưới cầu: layer ROCK (12) < BRIDGE (13)', () => {

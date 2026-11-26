@@ -44,6 +44,7 @@ Hiển thị **Full HD 1920×1080** nhưng **giữ toạ độ thế giới 1280
 - Mặt trăng cùng góc phải với mặt trời, ngay trên hồ.
 - Hàng rào 2 đoạn hai bên cửa; lối đi đất từ bậc thềm xuống tiền cảnh.
 - Thêm lá to tiền cảnh (#18), thỏ và chim (tuỳ chọn, #29).
+- **Đá tiền cảnh dời sang bờ gần hồ** (`x ≥ 700`, phải mép phải lối đi) thay cho `(300,665)`, `(432,660)`, `(495,628)`, `(752,692)`: bốn toạ độ cũ nằm giữa vùng hoa cỏ (#17) và lối đi (#16) nên chồng lấn khi ghép cảnh. Bốn tảng ven hồ vẫn giữ hoành độ như bảng (tung độ suy từ mép nước, xem `algorithms.md` §#20).
 - Hiển thị Full HD, toạ độ thế giới giữ 1280×720.
 
 ## Chi tiết Full HD
