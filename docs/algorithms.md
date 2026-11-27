@@ -1407,3 +1407,9 @@ Tương tác bổ sung: click trên hồ lưu world position vào `lastClickPosi
 Các màu lấy từ palette hiện tại; nấm lớn có halo alpha nhẹ ban đêm. Hình học được lưu tĩnh, không dùng random trong draw. Lá lớn tập trung ở góc phải dưới để tạo khung tiền cảnh; dương xỉ nhỏ nằm sát mép trái.
 
 Đốm trên ba nấm lớn có halo alpha dao động theo `sin(time × 1.15 + phase)`; phase riêng giúp mỗi cây lên/xuống sáng lệch nhịp. Bụi và lá dò con trỏ với ellipse hit vùng; lúc con trỏ vừa đi vào, Node quay quanh gốc theo dao động `sin(ωt)·exp(−kt)`, rồi tự tắt sau khoảng 1,5 giây.
+
+## #29 — Thỏ và chim
+
+Thỏ tại `(346, 585)` ghép thân, đầu, tai và đuôi vào một mask có outline; chân trước/sau là mask viền riêng vẽ phía trên. Tai là Node con, vểnh theo `env.pointer`. Click gọi `select` và khởi động bước nhảy parabol 0,6 giây với squash nhẹ khi tiếp đất; hit polygons bao thân và đầu.
+
+Hai chim dùng midpoint ellipse cho thân, polygon cho cánh và mỏ. Cánh là Node riêng vỗ theo sin; tọa độ bay ngang wrap trong vùng trời phía phải. Alpha giảm dần khi `dayPhase` tiến tới 0,4 để chim chỉ hiện ban ngày. Khi pointer đến gần, nhịp vỗ tăng nhanh và chim bật lên rồi hạ về quỹ đạo theo hàm suy giảm.
