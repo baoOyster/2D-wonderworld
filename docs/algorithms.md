@@ -1367,3 +1367,12 @@ Cầu gỗ kết hợp nhiều thuật toán đồ họa trong một vật thể
 Việc tính toán tọa độ bằng công thức thay vì hardcode từng chi tiết giúp cấu trúc cầu nhất quán, dễ điều chỉnh và thuận tiện khi tích hợp vào cảnh 2D.
 
 
+## #10 — Bầu trời, sao và thiên thể
+
+`Sky` phủ world 1280×720 bằng 32 dải đa giác tô scanline. Màu mỗi dải được nội suy tuyến tính qua ba điểm `skyTop → skyMid → skyBottom` của palette đang hoạt động, nên nền chuyển sắc cùng Theme ngày/đêm.
+
+`Stars` tạo cố định 70 vị trí bằng RNG seed `0x51a7` khi nạp module; vùng quanh tâm trăng được loại khỏi danh sách. Trong mỗi khung, alpha được điều chế bởi `sin(time × speed + phase)` và tăng tuyến tính khi `dayPhase > 0.35`. Một số sao dùng ô vuông 2×2, các sao còn lại là chấm midpoint circle.
+
+`Celestial` đặt mặt trời tại `(1188, 85)`, bán kính 34 và trăng tại `(1188, 150)`, bán kính 30. Các vòng glow dùng alpha source-over; đĩa có viền màu pha từ màu thiên thể và `inkSoft`, crater trăng dùng midpoint circle. Crossfade lấy smoothstep của `dayPhase`; hit polygon 32 đỉnh chỉ được trả về khi opacity thiên thể vượt 0,2. Click gọi `toggleDayNight()` qua `UiActions`, không phụ thuộc DOM.
+
+Factory `createBackground()` trả các object theo thứ tự layer: `Sky`, `Stars`, `Celestial`.
