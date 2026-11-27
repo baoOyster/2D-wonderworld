@@ -1389,3 +1389,11 @@ Object nằm ở `CLOUD = 3`, dưới núi layer 4; không tương tác. Factory
 `Mountains` dựng dãy xa bằng đa giác nhiều đỉnh từ đỉnh `(1188, 282)` xuống đế `y = 430`, sau đó thêm các mặt sáng/tối bằng polygon phụ. Sườn gần và đồi phải vẽ tiếp phía trước. Hai dải sương alpha thấp nằm ở chân núi. `Forest` sinh trước 30 cây xa và 18 cây gần bằng RNG seed cố định; thân và tán là đa giác silhouette, có thông cao phía trái sau vị trí thân cây cổ thụ. `Ground` phủ kín đáy, mép trên gợn quanh `y = 460`, kèm hai dải địa hình tối/sáng.
 
 Thứ tự layer tạo chiều sâu bằng painter's algorithm: núi xa/gần (4–5), rừng xa/gần (6–7), đất (8), hồ (9). Mọi đa giác dùng scanline polygon fill qua `Renderer`; geometry được tạo một lần, màu lấy từ palette ngày/đêm.
+
+## #13 — Hồ, gợn DDA và phản chiếu
+
+`Lake` tạo bờ ellipse, mặt nước nông, lòng hồ sâu lệch nhẹ và highlight bằng midpoint ellipse. Mười hai gợn sóng có tham số vị trí cố định từ RNG seed; `sin(time × speed + phase)` dịch chúng theo chiều dọc. Mỗi đoạn tính nửa bề rộng ellipse tại hàng y hiện tại, kẹp hai đầu vào biên và xác nhận điểm nằm trong hồ trước khi gọi DDA. Alpha theo từng gợn giảm độ gắt.
+
+Năm ellipse phản chiếu ánh trăng xếp dọc gần `x = 1188`, tăng/giảm alpha theo `dayPhase`; các glint ban ngày lấy màu `waterHighlight`. Viền hồ vẽ bằng ellipse midpoint màu `ink`. Hit-test dùng đa giác world-space 40 đỉnh trên cùng hình ellipse; `onClick` chọn object qua `UiActions`. Layer `LAKE = 9` đặt hồ trên nền đất và dưới cầu/cá/đá.
+
+Hồ theo layout issue #13 có tâm `(1010, 590)`, bán kính `300 × 66`; hit area, bờ và vùng ripple dùng chung kích thước. Phản chiếu trăng xếp quanh `x ≈ 1188` như vị trí thiên thể đã quy định.
