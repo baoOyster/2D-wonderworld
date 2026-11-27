@@ -1383,3 +1383,9 @@ Factory `createBackground()` trả các object theo thứ tự layer: `Sky`, `St
 Mỗi cụm có một `Node` gốc đặt tại tâm và scale đều 0,7–1,3. `mat3Apply(root.worldMatrix(), puffCenter)` biến đổi tâm puff local sang world; bán kính ellipse được scale cùng hệ số. Tọa độ ngang tiến theo thời gian ở tốc độ 4–12 world px/s rồi wrap trong chu kỳ world width cộng hai margin; bobbing dọc nhỏ dùng sin. Scale và vận tốc được cố định theo seed để tạo khác biệt parallax nhẹ.
 
 Object nằm ở `CLOUD = 3`, dưới núi layer 4; không tương tác. Factory `createBackground()` đăng ký lớp này cùng trời, sao và thiên thể.
+
+## #12 — Núi, rừng silhouette và nền đất
+
+`Mountains` dựng dãy xa bằng đa giác nhiều đỉnh từ đỉnh `(1188, 282)` xuống đế `y = 430`, sau đó thêm các mặt sáng/tối bằng polygon phụ. Sườn gần và đồi phải vẽ tiếp phía trước. Hai dải sương alpha thấp nằm ở chân núi. `Forest` sinh trước 30 cây xa và 18 cây gần bằng RNG seed cố định; thân và tán là đa giác silhouette, có thông cao phía trái sau vị trí thân cây cổ thụ. `Ground` phủ kín đáy, mép trên gợn quanh `y = 460`, kèm hai dải địa hình tối/sáng.
+
+Thứ tự layer tạo chiều sâu bằng painter's algorithm: núi xa/gần (4–5), rừng xa/gần (6–7), đất (8), hồ (9). Mọi đa giác dùng scanline polygon fill qua `Renderer`; geometry được tạo một lần, màu lấy từ palette ngày/đêm.
