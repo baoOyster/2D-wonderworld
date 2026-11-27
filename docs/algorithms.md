@@ -1376,3 +1376,10 @@ Việc tính toán tọa độ bằng công thức thay vì hardcode từng chi 
 `Celestial` đặt mặt trời tại `(1188, 85)`, bán kính 34 và trăng tại `(1188, 150)`, bán kính 30. Các vòng glow dùng alpha source-over; đĩa có viền màu pha từ màu thiên thể và `inkSoft`, crater trăng dùng midpoint circle. Crossfade lấy smoothstep của `dayPhase`; hit polygon 32 đỉnh chỉ được trả về khi opacity thiên thể vượt 0,2. Click gọi `toggleDayNight()` qua `UiActions`, không phụ thuộc DOM.
 
 Factory `createBackground()` trả các object theo thứ tự layer: `Sky`, `Stars`, `Celestial`.
+# #11 — Mây ellipse và biến đổi
+
+`CloudLayer` dựng năm cụm mây bằng geometry sinh một lần từ RNG seed cố định. Mỗi cụm có 4–7 midpoint ellipse chồng lấp; một khối ellipse lệch nhẹ xuống tạo bóng đáy bằng `cloudShade`. Ban đêm bóng pha alpha từ `moonGlow`, còn khối mây giữ `palette.cloud` để không chìm thành silhouette tối.
+
+Mỗi cụm có một `Node` gốc đặt tại tâm và scale đều 0,7–1,3. `mat3Apply(root.worldMatrix(), puffCenter)` biến đổi tâm puff local sang world; bán kính ellipse được scale cùng hệ số. Tọa độ ngang tiến theo thời gian ở tốc độ 4–12 world px/s rồi wrap trong chu kỳ world width cộng hai margin; bobbing dọc nhỏ dùng sin. Scale và vận tốc được cố định theo seed để tạo khác biệt parallax nhẹ.
+
+Object nằm ở `CLOUD = 3`, dưới núi layer 4; không tương tác. Factory `createBackground()` đăng ký lớp này cùng trời, sao và thiên thể.
