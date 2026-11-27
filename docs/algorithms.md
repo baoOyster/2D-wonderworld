@@ -1397,3 +1397,13 @@ Thứ tự layer tạo chiều sâu bằng painter's algorithm: núi xa/gần (4
 Năm ellipse phản chiếu ánh trăng xếp dọc gần `x = 1188`, tăng/giảm alpha theo `dayPhase`; các glint ban ngày lấy màu `waterHighlight`. Viền hồ vẽ bằng ellipse midpoint màu `ink`. Hit-test dùng đa giác world-space 40 đỉnh trên cùng hình ellipse; `onClick` chọn object qua `UiActions`. Layer `LAKE = 9` đặt hồ trên nền đất và dưới cầu/cá/đá.
 
 Hồ theo layout issue #13 có tâm `(1010, 590)`, bán kính `300 × 66`; hit area, bờ và vùng ripple dùng chung kích thước. Phản chiếu trăng xếp quanh `x ≈ 1188` như vị trí thiên thể đã quy định.
+
+Tương tác bổ sung: click trên hồ lưu world position vào `lastClickPosition` và thời gian vào `lastClickTime` để cá có thể đọc và tản ra. Ba vòng ellipse mở rộng, trễ nhẹ nhau, rồi fade trong 1,5 giây. Khi `env.pointer` nằm trong ellipse nước, một gợn nhỏ pulse theo con trỏ; ngoài hồ thì không vẽ.
+
+## #18 — Nấm, bụi cây và lá tiền cảnh
+
+`createDecor()` đăng ký bụi cây trước nấm nhỏ ở layer `SMALL_DECOR`, rồi lá ở `LEAF_FG`. Bụi ghép 4–7 ellipse vào một mask và tô ba tông để che các chân cây/nhà mà không che cửa. Nấm lớn vẽ thân polygon và mũ vòm; các đốm midpoint circle được cắt theo mask mũ. Nấm nhỏ sinh theo seed cố định thành hai cụm và nghiêng nhẹ bằng ma trận tịnh tiến/rotation. Lá được xấp xỉ từ ellipse polygon, xoay quanh tâm bằng `mat3`, rồi tô và viền bằng polygon fill.
+
+Các màu lấy từ palette hiện tại; nấm lớn có halo alpha nhẹ ban đêm. Hình học được lưu tĩnh, không dùng random trong draw. Lá lớn tập trung ở góc phải dưới để tạo khung tiền cảnh; dương xỉ nhỏ nằm sát mép trái.
+
+Đốm trên ba nấm lớn có halo alpha dao động theo `sin(time × 1.15 + phase)`; phase riêng giúp mỗi cây lên/xuống sáng lệch nhịp. Bụi và lá dò con trỏ với ellipse hit vùng; lúc con trỏ vừa đi vào, Node quay quanh gốc theo dao động `sin(ωt)·exp(−kt)`, rồi tự tắt sau khoảng 1,5 giây.

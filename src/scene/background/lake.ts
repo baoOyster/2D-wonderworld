@@ -39,9 +39,20 @@ export class Lake implements SceneObject {
   readonly algorithms = ['Midpoint ellipse', 'DDA', 'Alpha blending', 'Ellipse hit polygon'];
   readonly layer = Layer.LAKE;
   readonly interactive = true;
+  /** Last click in world space; fish can read this to scatter away. */
+  lastClickPosition: Vec2 | null = null;
+  /** Environment time of the most recent click. */
+  lastClickTime = Number.NEGATIVE_INFINITY;
 
   hitPolygons(_env: Env): readonly Vec2[][] { return [HIT_POLYGON]; }
-  onClick(ctx: ClickContext): void { ctx.ui.select(this); }
+  onClick(ctx: ClickContext): void {
+    ctx.ui.select(this);
+    const pointer = (ctx.env as Env & { pointer?: Vec2 | null }).pointer;
+    if (pointer && inLake(pointer.x, pointer.y)) {
+      this.lastClickPosition = { x: pointer.x, y: pointer.y };
+      this.lastClickTime = ctx.env.time;
+    }
+  }
 
   draw(r: Renderer, env: Env): void {
     const p = env.palette;
@@ -80,6 +91,30 @@ export class Lake implements SceneObject {
         r.ellipse(reflection.x, y, reflection.rx, reflection.ry,
           withAlpha(p.moonGlow, reflection.alpha * night), true);
       }
+    }
+
+    // Three delayed ellipse rings expand and fade over 1.5 seconds.
+    if (this.lastClickPosition) {
+      const age = env.time - this.lastClickTime;
+      if (age >= 0 && age < 1.5) {
+        for (let i = 0; i < 3; i++) {
+          const ringAge = age - i * 0.22;
+          if (ringAge < 0) continue;
+          const progress = Math.min(1, ringAge / 1.5);
+          const rx = 5 + progress * 50;
+          const ry = 2 + progress * 12;
+          r.ellipse(this.lastClickPosition.x, this.lastClickPosition.y, rx, ry,
+            withAlpha(p.waterHighlight, (1 - progress) * 0.75), false);
+        }
+      }
+    }
+
+    // A small cursor-following ripple appears only while the pointer is on water.
+    const pointer = (env as Env & { pointer?: Vec2 | null }).pointer;
+    if (pointer && inLake(pointer.x, pointer.y)) {
+      const pulse = 0.5 + 0.5 * Math.sin(env.time * 5);
+      r.ellipse(pointer.x, pointer.y, 8 + pulse * 3, 3 + pulse, withAlpha(p.waterHighlight, 0.72), false);
+      r.ellipse(pointer.x, pointer.y, 2, 1, withAlpha(p.waterHighlight, 0.45), true);
     }
     r.ellipse(CX, CY, RX, RY, p.ink, false);
   }

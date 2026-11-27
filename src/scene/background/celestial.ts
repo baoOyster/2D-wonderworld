@@ -22,15 +22,20 @@ export class Celestial implements SceneObject {
   onClick(ctx: ClickContext): void { ctx.ui.toggleDayNight(); }
   draw(r: Renderer, env: Env): void {
     const night = smooth(env.dayPhase), day = 1 - night, p = env.palette;
+    const pointer = (env as Env & { pointer?: Vec2 | null }).pointer;
+    const hovered = (body: typeof SUN | typeof MOON): boolean => !!pointer &&
+      (pointer.x - body.x) ** 2 + (pointer.y - body.y) ** 2 <= body.r ** 2;
+    const sunGlowScale = hovered(SUN) ? 1.12 : 1;
+    const moonGlowScale = hovered(MOON) ? 1.12 : 1;
     const sunRim = lerpColor(p.sun, p.inkSoft, 0.55);
     const moonRim = lerpColor(p.moon, p.inkSoft, 0.5);
     if (day > 0.005) {
-      for (const [radius, alpha] of [[58, 0.08], [49, 0.12], [41, 0.2]] as const) r.circle(SUN.x, SUN.y, radius, withAlpha(p.sunGlow, alpha * day), true);
+      for (const [radius, alpha] of [[58, 0.08], [49, 0.12], [41, 0.2]] as const) r.circle(SUN.x, SUN.y, radius * sunGlowScale, withAlpha(p.sunGlow, alpha * day), true);
       r.circle(SUN.x, SUN.y, SUN.r, withAlpha(sunRim, day));
       r.circle(SUN.x, SUN.y, SUN.r - 2, withAlpha(p.sun, day), true);
     }
     if (night > 0.005) {
-      r.circle(MOON.x, MOON.y, 46, withAlpha(p.moonGlow, 0.12 * night), true);
+      r.circle(MOON.x, MOON.y, 46 * moonGlowScale, withAlpha(p.moonGlow, 0.12 * night), true);
       r.circle(MOON.x, MOON.y, MOON.r, withAlpha(moonRim, night));
       r.circle(MOON.x, MOON.y, MOON.r - 2, withAlpha(p.moon, night), true);
       const crater = lerpColor(p.moon, p.inkSoft, 0.28);
