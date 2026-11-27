@@ -12,6 +12,7 @@ chung. Mỗi issue cập nhật phần tương ứng ngay trong PR của mình.
 - [#33 — Scene types & layers](#33--scene-types--layers)
 - [#8 — Camera & vòng lặp engine](#8--camera--vòng-lặp-engine)
 - [#34 — Renderer hoàn chỉnh](#34--renderer-hoàn-chỉnh)
+- [#9 — Input, hit-test & World](#9--input-hit-test--world)
 - [#5 — Palette ngày/đêm](#5--palette-ngàyđêm)
 
 ---
@@ -566,6 +567,57 @@ Test: `tests/scene-types.test.ts`.
   quan hệ z-order giữa các nhóm.
 - Test dựng một `SceneObject` mẫu (kèm `UiActions`, `Renderer` giả) để chắc
   hợp đồng dùng được: `update`, `draw`, `hitPolygons`, `onClick`, callbacks.
+
+## #9 — Input, hit-test & World
+
+Mã nguồn: `src/core/hit-test.ts`, `src/core/input.ts`, `src/scene/world.ts`.
+Test: `tests/hit-test.test.ts`, `tests/input.test.ts`, `tests/world.test.ts`.
+Demo thử tay: `?demo=world`.
+
+### Point-in-polygon & broad phase
+
+- `pointInPolygon(p, poly)` dùng **ray casting even-odd**: bắn tia ngang sang
+  phải, đếm số cạnh cắt; số lẻ là trong. Không dùng API hit-test của canvas.
+- Kiểm tra **điểm trên biên trước** bằng tích chéo có chuẩn hoá sai số theo độ
+  dài cạnh; nhờ vậy điểm trên cạnh/đỉnh luôn được coi là trong, tránh lỗi khi
+  tia đi đúng qua đỉnh.
+- `boundsOf(polygons)` gộp AABB mọi đỉnh; `boundsContain` kiểm tra nhanh. Khi
+  pick: sort layer tăng dần, duyệt **ngược** (vật vẽ sau nằm trên), bỏ vật
+  không `interactive`, thử AABB trước rồi mới ray cast từng polygon.
+
+### Quy đổi toạ độ & camera
+
+- `canvasPointToLogical(point, rect, canvasW, canvasH)` bù CSS scale/letterbox:
+  `x = (clientX − rect.left) / rect.width · canvasWidth` (tương tự y), cho ra
+  pixel canvas (backing store) mà `Camera.screenToWorld` chờ đợi.
+- Camera đã gồm `RENDER_SCALE`; world → screen = `RS · (zoom·world + pan)`.
+- Zoom quanh con trỏ: giữ nguyên điểm world dưới chuột bằng
+  `pan' = screen/RS − zoom' · worldUnderCursor`, rồi clamp pan trong world.
+- Pan: kéo chuột giữa/phải hoặc `Space` + kéo trái;
+  `camera.pan += Δscreen / RENDER_SCALE` (camera tự clamp), không lộ ngoài world.
+
+### Input (`attachInput`)
+
+- `pointerdown/up`: nhấn-thả trái trong bán kính 4 px là click → pick + `onClick`;
+  click nền → `select(null)`.
+- `pointermove`: hover + đổi cursor `pointer`/`default`; khi pan thì cộng delta.
+- `wheel` (`passive: false`): `factor = exp(−deltaY · 0.0015)`, zoom quanh con trỏ.
+- Phím: `N` ngày/đêm, `+`/`-` zoom quanh tâm, `0` reset, `Esc` bỏ chọn; bỏ qua
+  khi focus ở `input`/`textarea`/`contenteditable`.
+- Trả hàm cleanup gỡ toàn bộ listener.
+
+### World
+
+- `World(camera, objects, theme, callbacks?)` sort theo `layer` **một lần**, giữ
+  ổn định thứ tự cùng layer.
+- `update`: `theme.update` → tạo `Env` mới (`time`, `dt`, `dayPhase`, `palette`,
+  `camera`) → gọi `update` từng vật. `draw` vẽ theo đúng thứ tự đã sort.
+- `pickAt/pickFromScreen`: point-in-polygon như trên; `hoverFromScreen` cập nhật
+  hover; `clickFromScreen` chọn + gọi `onClick`.
+- Implement `UiActions` (`toggleDayNight`, `select`, `getSelected`) và gọi
+  `WorldCallbacks.onSelectionChange/onHoverChange` **chỉ khi trạng thái đổi**.
+- `drawOverlay`: tạm vẽ viền polygon vật đang chọn bằng `palette.selection`
+  (hiệu ứng đầy đủ ở #25).
 
 ## #8 — Camera & vòng lặp engine
 
