@@ -13,6 +13,7 @@ import { Renderer } from '../core/renderer.ts';
 import { DayNightCycle } from '../scene/theme.ts';
 import type { Env } from '../scene/types.ts';
 import { World } from '../scene/world.ts';
+import { mountUi } from '../ui/index.ts';
 import { collectSceneObjects } from './scene.ts';
 
 let started = false;
@@ -22,6 +23,7 @@ let renderer: Renderer | null = null;
 let overlay: Renderer | null = null;
 let target: Framebuffer | null = null;
 let lastTime = -1;
+let uiCleanup: (() => void) | null = null;
 
 function drawBackdrop(fb: Framebuffer, env: Env): void {
   const p = env.palette;
@@ -54,6 +56,12 @@ export default function worldDemo(fb: Framebuffer, t: number): void {
     target = fb;
     renderer = new Renderer(fb, camera);
     overlay = new Renderer(fb, new Camera());
+
+    // UI thật (#24) chỉ để thử tay; `main.ts` sẽ gắn một dòng ở #26.
+    if (typeof document !== 'undefined') {
+      uiCleanup?.();
+      uiCleanup = mountUi(document.body, { camera, framebuffer: fb }, world);
+    }
   }
 
   const dt = lastTime < 0 || t < lastTime ? 1 / 60 : Math.min(0.1, t - lastTime);

@@ -619,6 +619,40 @@ Demo thử tay: `?demo=world`.
 - `drawOverlay`: tạm vẽ viền polygon vật đang chọn bằng `palette.selection`
   (hiệu ứng đầy đủ ở #25).
 
+## #24 — Info panel & toolbar
+
+Mã nguồn: `src/ui/panel.ts`, `src/ui/toolbar.ts`, `src/ui/index.ts`,
+`src/ui/labels.ts`, `src/ui/ui.css`.
+Test: `tests/ui-labels.test.ts`, `tests/ui-dom.test.ts` (nhãn/zoom, panel & toolbar
+với DOM stub tối giản; vẫn nên xem trực tiếp `?demo=world`).
+Demo thử tay: `?demo=world`.
+
+### Panel thông tin
+
+- `createInfoPanel(root, { onClose })` dựng `aside` với tiêu đề, mô tả và danh
+  sách chip thuật toán. Nội dung đặt qua `textContent`, không `innerHTML`.
+- `setObject(obj | null)` chỉ vẽ lại khi vật đổi; `null` ẩn panel. Đóng bằng nút
+  `×` hoặc `Esc` → `onClose` (lớp gọi `world.select(null)`).
+- `aria-live="polite"`, tiêu đề gắn `aria-labelledby`, nút đóng có `aria-label`.
+  Panel `pointer-events: auto` còn shell `none`, nên click ngoài panel vẫn xuống
+  canvas; dưới 720 px chuyển thành bottom sheet cao tối đa 40vh.
+
+### Toolbar
+
+- Nút `+`/`−` gọi `camera.zoomAt(tâm framebuffer, 1.2)`; "Đặt lại" gọi
+  `camera.reset()`; nút ngày/đêm gọi `world.toggleDayNight()`.
+- `sync()` đọc lại `camera.zoom` và `world.environment.dayPhase` để nhãn zoom &
+  Ngày/Đêm luôn khớp, kể cả khi đổi bằng chuột/phím tắt (`N`, `+`, `-`, `0`).
+- Có `role="toolbar"`, `aria-label`, `aria-pressed` cho nút ngày/đêm, và dòng gợi
+  ý phím tắt.
+
+### Gắn UI
+
+- `mountUi(container, engine, world)` tạo shell + toolbar + panel, chạy một vòng
+  `requestAnimationFrame` đồng bộ lựa chọn/nhãn; trả hàm cleanup huỷ vòng lặp và
+  gỡ DOM/listener.
+- `UiEngine` chỉ cần `{ camera, framebuffer }`; `main.ts` sẽ gọi một dòng ở #26.
+
 ## #8 — Camera & vòng lặp engine
 
 Mã nguồn: `src/core/camera.ts`, `src/core/engine.ts`, `src/core/presenter.ts`
